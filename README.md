@@ -12,4 +12,4 @@ This is the most basic way to use syc. Any changes to `variable` on the server w
 
 This is accomplished by tracking the variable with Object.observe (or use a dirty-checking polyfill if Object.observe is not available. More on that in the Polyfill section).
 
-WARNING: This is intended for prototyping a project. This use of syc is not recommended for public-facing or sites with untrusted clients. If any client maliciously modifies the variable, the changes will be reflected in the server as well as every other client.
+**WARNING**: This is intended for prototyping a project. This use of syc is not recommended for public-facing or sites with untrusted clients. If any client maliciously modifies the variable, the changes will be reflected in the server as well as every other client.

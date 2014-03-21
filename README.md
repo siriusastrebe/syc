@@ -3,7 +3,7 @@ syc
 
 Sync a variable on the client and the server using Socket.io and Object.observe
 
-# Setting up syc
+## Setting up syc
 
 Syc uses socket.io to transmit information from client to server. You will need to set up socket.io independently of syc.
 
@@ -16,9 +16,9 @@ Syc uses socket.io to transmit information from client to server. You will need 
 
 The client will gain access to any variables already bound, and will recieve any changes to those variables.
 
-# Using Syc
+## Using Syc
 
-## Binding a variable
+### Binding a variable
 
     syc.sync (variable)
 

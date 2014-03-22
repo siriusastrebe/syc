@@ -65,7 +65,7 @@ This returns an array of variables bound to the user
 You can create a group to add users into:
 
     misfits = syn.group()
-    
+
 And then add users by
 
     misfits.add(user)
@@ -74,11 +74,9 @@ Now you can sync a variable to everybody in the group, including anybody who joi
 
     mistfits.sync(variable) 
     
-Other group commands: 
+If you ever need to reference which users are assigned to a group:
 
     misfits.list()
-    
-    
 
 ### Watchers (Client + Server)
 

@@ -108,6 +108,7 @@ Sometimes, buffon will not be available on the client at the time of asking. You
     
     syc.monitor('bouffon', watch);
 
+The callback will be called when a variable by the name of buffon becomes available. 
 
 You can see all the watchers on your variable by asking the sync object.
 

@@ -49,8 +49,11 @@ This is a 'safer' way to sync since the variable is not shared with other client
 Other common methods users contain: 
 
 `user.socket()` This returns the socket.io socket bound to the user.
+
 `user.synced` This returns an array of variables with two-way binding to the user
+
 `user.serviced` Much like above, but listing just the one way bindings.
+
 `user.group(name)` Adding the user to a group by name.
 
 ### Handling groups (Server)

@@ -30,7 +30,7 @@ This is accomplished by tracking the variable with Object.observe (or use a dirt
 
     syc.serve(variable)
     
-This is a safe way of allowing clients to receive changes to a variable. Changes on the server side will be sent to each client. If the client's version of the variable is modified, it will revert to match the server side's version immediately (or, on the next dirty-check if Object.observe is not available client-side)
+This is a safe way of allowing clients to receive changes to a variable. Changes on the server side will be sent to each client. If the client's version of the variable is modified, it will revert to match the server side's version immediately
 
 ### Juggling Users (Server Side)
 

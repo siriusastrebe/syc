@@ -70,7 +70,8 @@ Now you can sync a variable to everybody in the group, including anybody who joi
 
     misfits.serve(variable)
     
-`misfits.users` If you ever need to reference which users are assigned to a group
+`misfits.users` If you ever need to reference which users are assigned to a group.
+
 `syc.groups` is a list of groups, by name.
 
 

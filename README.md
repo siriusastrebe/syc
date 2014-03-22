@@ -112,6 +112,8 @@ You can see all the watchers on your variable by asking the sync object.
 
 ### Verification (Server Side)
 
+Watchers on the server allow you to respond to a variable change after a client has modified and synced it with the server. If you want to catch a change before it is accepted by the server and duplicated across clients, you can verify it:
+
     function check (variable, failure) {
       if (typeof variable === 'string') {
         return variable;
@@ -123,7 +125,7 @@ You can see all the watchers on your variable by asking the sync object.
     bouffon = syc.sync(variable)
     bouffon.verify(check)
    
-When bouffon changes value on a client, you can verify its new contents before the server accepts the modifications. If it turns out the client had modified the variable in an inapropriate way, you can call `failure` function, which will cause the client to reset his value to match the server.
+If it turns out the client had modified the variable in an inapropriate way, you can call `failure` function, which will cause the client to reset his value to match the server.
 
     function check2 (variable, failure) {
       if (typeof variable === 'string') {

@@ -42,21 +42,15 @@ This is a safe way of allowing clients to receive changes to a variable. Changes
 
     user.sync(variable)
 
-This is a 'safer' way to sync since the variable is not shared with other clients. You are allowed to sync the same variable to different users, but then a client may change the variable and the other users will see the change.
+This is a 'safer' way to sync since the variable is not shared with other clients. You are allowed to sync the same variable to different users, but then a client may change the variable and the other users will see the change. You can also serve directly to a user.
 
-You can add a user to a group
+    user.serve(variable)
 
-    user.group(group-name)
-    
 Other common methods users contain: 
 
-    user.socket()
-    
-This returns the socket.io socket bound to the user.
-    
-    user.synced()
-    
-This returns an array of variables bound to the user 
+`user.socket()` This returns the socket.io socket bound to the user.
+
+`user.synced()` This returns an array of variables bound to the user 
 
 ### Handling groups (Server)
 
@@ -71,6 +65,9 @@ And then add users by
 Now you can sync a variable to everybody in the group, including anybody who joins the group.
 
     mistfits.sync(variable) 
+    
+
+    misfits.serve(variable)
     
 If you ever need to reference which users are assigned to a group:
 

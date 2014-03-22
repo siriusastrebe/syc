@@ -16,8 +16,6 @@ Syc uses socket.io to transmit information from client to server. You will need 
         syc.connect(socket);
     });
 
-The client will gain access to any variables already bound, and will recieve any changes to those variables.
-
 ## Using Syc
 
 ### Binding a variable (Server side)

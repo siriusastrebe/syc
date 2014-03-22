@@ -90,7 +90,7 @@ Now, if the value is modified by any of the clients the callback will be trigger
 
     bouffon.watchers()
 
-### Verification
+### Verification (Server Side)
 
     function check (variable, failure) {
       if (typeof variable === 'string') {

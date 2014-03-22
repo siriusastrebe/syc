@@ -49,14 +49,15 @@ This is a 'safer' way to sync since the variable is not shared with other client
 Other common methods users contain: 
 
 `user.socket()` This returns the socket.io socket bound to the user.
-
-`user.synced()` This returns an array of variables bound to the user 
+`user.synced` This returns an array of variables with two-way binding to the user
+`user.serviced` Much like above, but listing just the one way bindings.
+`user.group(name)` Adding the user to a group by name.
 
 ### Handling groups (Server)
 
 You can create a group to add users into:
 
-    misfits = syn.group()
+    misfits = syn.group('misfits')
 
 And then add users by
 
@@ -69,9 +70,9 @@ Now you can sync a variable to everybody in the group, including anybody who joi
 
     misfits.serve(variable)
     
-If you ever need to reference which users are assigned to a group:
+`misfits.users` If you ever need to reference which users are assigned to a group
+`syc.groups` is a list of groups, by name.
 
-    misfits.list()
 
 ### Watchers (Client + Server)
 

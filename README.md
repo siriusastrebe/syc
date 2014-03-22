@@ -77,13 +77,34 @@ If you ever need to reference which users are assigned to a group:
 
 Often you want to do something the moment the variable changes.
 
-    gerrymander = "I dare say!"
+    gerrymander = "I dare say!";
     
-    bouffon = syc.sync(gerrymander)
+    bouffon = syc.sync(gerrymander);
     
-    bouffon.watch(callback)
+    bouffon.watch(callback);
     
-Now, if the value is modified by any of the clients the callback will be triggered. You can see all the watchers on your variable by asking the sync object.
+Now, if the value is modified by any of the clients the callback will be triggered. 
+
+
+If you're working on the client, you can access bound variables via the syc.variables method.
+
+    <script src="sync.js">
+      syc = new syc();
+      bouffon = syc.variables['buffon'];
+      bouffon.watch(callback);
+    </script>
+
+
+Sometimes, buffon will not be available on the client at the time of asking. You can plan ahead instead:
+
+    function watch (variable) { 
+      variable.watch(callback);
+    }
+    
+    syc.monitor('bouffon', watch);
+
+
+You can see all the watchers on your variable by asking the sync object.
 
     bouffon.watchers()
 
@@ -110,4 +131,4 @@ When bouffon changes value on a client, you can verify its new contents before t
       }
     }
     
-Using this method, you can also cause the variable to be replaced with a different value if the client has damaged the variable in some way.
+Using this technique, you can also cause the variable to be replaced with a different value if the client has damaged the variable in some way.

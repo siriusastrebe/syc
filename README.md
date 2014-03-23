@@ -22,7 +22,7 @@ Syc uses socket.io to transmit information from client to server. You will need 
 
     syc.sync(variable, name)
 
-This is the most basic way to use syc. Any changes to `variable` on the server will be reflected on a variable by the same name on every client. Changes on the client will reflect on the server (and therefore to every other client).
+This is the most basic way to use syc. Any changes to `variable` on the server will be reflected on a variable identified by `name` on the client. Changes on the client will reflect on the server (and therefore to every other client).
 
 This is accomplished by tracking the variable with Object.observe (or use a dirty-checking polyfill if Object.observe is not available. More on that in the Polyfill section).
 

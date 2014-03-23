@@ -20,7 +20,7 @@ Syc uses socket.io to transmit information from client to server. You will need 
 
 ### Binding a variable (Server side)
 
-    syc.sync(variable)
+    syc.sync(variable, name)
 
 This is the most basic way to use syc. Any changes to `variable` on the server will be reflected on a variable by the same name on every client. Changes on the client will reflect on the server (and therefore to every other client).
 
@@ -28,7 +28,7 @@ This is accomplished by tracking the variable with Object.observe (or use a dirt
 
 **WARNING**: This is intended for prototyping a project. Syncing a variable without verifying it first is not recommended for public-facing or sites with untrusted clients. If any client maliciously modifies the variable, the changes will be reflected in the server as well as every other client.
 
-    syc.serve(variable)
+    syc.serve(variable, name)
     
 This is a safe way of allowing clients to receive changes to a variable. Changes on the server side will be sent to each client. If the client's version of the variable is modified, it will revert to match the server side's version immediately
 
@@ -40,19 +40,21 @@ This is a safe way of allowing clients to receive changes to a variable. Changes
 
 `syc.connect` returns a syc user object. If you want to bind a variable only to this user, use:
 
-    user.sync(variable)
+    user.sync(variable, name)
 
 This is a 'safer' way to sync since the variable is not shared with other clients. You are allowed to sync the same variable to different users, but then a client may change the variable and the other users will see the change. You can also serve directly to a user.
 
-    user.serve(variable)
+    user.serve(variable, name)
 
 Other common methods users contain: 
 
 `user.socket()` This returns the socket.io socket bound to the user.
 
-`user.synced` This returns an array of variables with two-way binding to the user
+`user.synced` This returns an associative array of variables with two-way binding to the user
 
-`user.serviced` Much like above, but listing just the one way bindings.
+`user.served` Much like above, but showing just the one way bindings.
+
+`user.variables` This lists both synced and served variables.
 
 `user.group(name)` Adding the user to a group by name.
 
@@ -68,14 +70,16 @@ And then add users by
 
 Now you can sync a variable to everybody in the group, including anybody who joins the group.
 
-    mistfits.sync(variable) 
+    mistfits.sync(variable, name) 
     
-
-    misfits.serve(variable)
+    
+    misfits.serve(variable, name)
     
 `misfits.users` If you ever need to reference which users are assigned to a group.
 
 `syc.groups` is a list of groups, by name.
+
+As above, `misfits.synced`, `misfits.served`, and `misfits.variables` will get you an associative array of bound variables.
 
 
 ### Watchers (Client + Server)
@@ -84,7 +88,7 @@ Often you want to do something the moment the variable changes.
 
     gerrymander = "I dare say!";
     
-    bouffon = syc.sync(gerrymander);
+    bouffon = syc.sync(gerrymander, 'gerrymander');
     
     bouffon.watch(callback);
     
@@ -95,24 +99,29 @@ If you're working on the client, you can access bound variables via the syc.vari
 
     <script src="sync.js">
       syc = new syc();
-      bouffon = syc.variables['buffon'];
+      bouffon = syc.synced['gerrymander'];
       bouffon.watch(callback);
     </script>
 
 
 Sometimes, buffon will not be available on the client at the time of asking. You can plan ahead instead:
 
-    function watch (variable) { 
+    function watch (variable, name) { 
       variable.watch(callback);
     }
     
-    syc.monitor('bouffon', watch);
+    syc.monitor('gerrymander', watch);
 
 The callback will be called when a variable by the name of buffon becomes available. 
 
 You can see all the watchers on your variable by asking the sync object.
 
     bouffon.watchers()
+    
+And all watchers in general, in a key/value pair with name/watcher:
+
+    syc.watchers()
+
 
 ### Verification (Server Side)
 

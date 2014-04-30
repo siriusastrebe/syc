@@ -37,14 +37,22 @@ app.get('/users', user.list);
 
 io.on('connection', function (socket) {
   syc.connect(socket);
-  socket.emit('conn', {one: 'drop da beat', two: 'feel da heat'});
 });
 
 v = new syc.sync('YO');
 
-var i = 0;
+var i = 2;
+var j = 0;
+var h = 0;
 
-setInterval(function () { v.i = i; i++ }, 3600);
+setInterval(function () { v[i] = i; i++ }, 7000);
+setInterval(function () { v[0] = {j: [j]}; j++ }, 11000);
+setInterval(function () { v[1] = recurse(h); h++ }, 17000);
+
+function recurse (h) { 
+  if (h > 0) return {h: recurse(h-1)}
+  else return 0;
+}
 
 server.listen(3000);
 

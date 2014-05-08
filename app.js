@@ -41,13 +41,22 @@ io.on('connection', function (socket) {
 
 v = new syc.sync('YO');
 
-var i = 2;
-var j = 0;
-var h = 0;
+var i = 0;
 
-setInterval(function () { v[i] = i; i++ }, 7000);
-setInterval(function () { v[0] = {j: [j]}; j++ }, 11000);
-setInterval(function () { v[1] = recurse(h); h++ }, 17000);
+setTimeout(function () {
+//setInterval(function () { v[i] = i; i++ }, 7000);
+v[i++] = [1, 2, 5, 7, 8];
+v[i++] = [[1, 2,], [3, 4], [5,6]];
+v[i++] = [{a: '1', b: '2'}, {z: '3'}];
+v[i++] = {Yeezus: 'ima let you finish, but', hank: 'Propane Accessories'};
+  setTimeout(function () { 
+    v[0].push(9); v[1].push(3); v[2][1]['y'] = '2';
+  }, 1000);
+}, 3000);
+
+/*
+setInterval(function () { v[i] = []; for (var j=0; j++; i<i) { v[i].push(i)}; i++ }, 3000);
+*/
 
 function recurse (h) { 
   if (h > 0) return {h: recurse(h-1)}
@@ -55,5 +64,4 @@ function recurse (h) {
 }
 
 server.listen(3000);
-
 

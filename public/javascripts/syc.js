@@ -7,14 +7,20 @@ var Syc = {
     socket.on('syc-variable-new', Syc.New_Variable);
   },
 
-  list: function () {
-    var all = {}
-    for (variable in Syc.variables) {
-      var id = Syc.variables[variable];
-      all[id] = Syc.objects[id];
+  list: function (name) {
+    if (name === undefined) { 
+      var all = {}
+      for (variable in Syc.variables) {
+        var id = Syc.variables[variable];
+        all[variable] = Syc.objects[id];
+      }
+      return all;
+    } else {
+      return Syc.objects[Syc.variables[name]];
     }
-    return all;
   },
+
+  List: function (argument) { Syc.list(argument) },
 
 
   /* ---- ---- ---- ----  Private Members  ---- ---- ---- ---- */
@@ -37,6 +43,8 @@ var Syc = {
         id = data.id,
         properties = data.properties;
 
+//    console.log(id); console.log(properties); console.log(' - ');
+
     if (id in Syc.objects) throw 'Add Error: Object by id ' + id + ' already exists.';
     Syc.objects[id] = variable;
 
@@ -55,7 +63,7 @@ var Syc = {
     var variable = Syc.objects[id];
 
     variable[property] = Syc.Type(type, value);
-    console.log(Syc.Type(type, value));
+//    console.log(Syc.Type(type, value));
 
     if (variable[property] === undefined) { 
       if (type === 'object' || type === 'array') { 
@@ -70,11 +78,11 @@ var Syc = {
 
     for (link in unlinked) { 
       if (unlinked[link].id in Syc.objects) { 
-        console.log(Syc.objects[unlinked[link].id]);
-        Syc.objects[unlinked[link].owner] = Syc.objects[unlinked[link].id];
+        var data = unlinked[link];
+        Syc.objects[data.owner][data.property] = Syc.objects[data.id];
       }
       else {
-        console.log('emitting');
+//        console.log('emitting');
         Syc.Socket.emit('syc-object-request', { id: unlinked[link].id });
       }
       delete unlinked[link];

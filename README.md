@@ -33,4 +33,11 @@ The client will be able to access this variable by getting the reference to it:
 
     var synced = syc.list('name')
 
-Now, any time the variable is modified on the server side, the client side will match to reflect what's on the server. 
+Now, any time the variable is modified on the server side, 
+
+    synced['hello'] = 'world';
+    
+The client side will match to reflect what's on the server.
+
+- - - 
+Syc currently supports the primitive types (numbers, strings, booleans), as well as dates and regular expressions. Syc also supports Objects, Arrays, any any recursive combination of the two. If you would like to see additional types supported by Syc, please send an email to https://github.com/siriusastrebe

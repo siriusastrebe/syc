@@ -40,4 +40,4 @@ Now, any time the variable is modified on the server side,
 The client side will match to reflect what's on the server.
 
 - - - 
-Syc currently supports the primitive types (numbers, strings, booleans), as well as dates and regular expressions. Syc also supports Objects, Arrays, any any recursive combination of the two. If you would like to see additional types supported by Syc, please send an email to https://github.com/siriusastrebe
+Syc currently supports the primitive types numbers, strings, booleans, as well as dates and regular expressions. Syc also supports Objects, Arrays, any any recursive combination of the two. If you would like to see additional types supported by Syc, please send an email to https://github.com/siriusastrebe

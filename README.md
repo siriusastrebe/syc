@@ -1,13 +1,13 @@
 Syc
 ===
 
-WebSockets are great for dynamic web-apps, but message passing from Server to Client can add a lot of code, maintenance, confusion, and obfuscation. 
+WebSockets are great for dynamic web-apps, but message passing from Server to Client can add a lot of code, maintenance, and confusion. 
 
 Syc allows you to create a variable which, when modified on the server, will reflect those same changes on the client. It works under a simple principle: All data bound to the variable in question is identical between Server and Client.
 
 Like Meteor, but without the framework.
 
-** Currently, Syc requires ECMA 7 on the server side to operate. Update Node.js to latest and run: `node --harmony app.js` **
+** Currently, Syc uses Object.observe and requires ECMA 7 on the server side to operate. Update Node.js to latest and run using the harmony flag: `node --harmony app.js` **
 
 ## Setting up Syc
 

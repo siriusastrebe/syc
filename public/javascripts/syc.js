@@ -82,7 +82,6 @@ var Syc = {
         Syc.objects[data.owner][data.property] = Syc.objects[data.id];
       }
       else {
-//        console.log('emitting');
         Syc.Socket.emit('syc-object-request', { id: unlinked[link].id });
       }
       delete unlinked[link];

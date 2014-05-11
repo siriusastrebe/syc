@@ -41,6 +41,8 @@ io.on('connection', function (socket) {
 
 v = new syc.sync('YO');
 
+y = new syc.sync('BRO');
+
 var i = 0;
 
 setTimeout(function () {
@@ -54,14 +56,44 @@ v[i++] = {Yeezus: 'ima let you finish, but', hank: 'Propane Accessories'};
   }, 1000);
 }, 3000);
 
-/*
-setInterval(function () { v[i] = []; for (var j=0; j++; i<i) { v[i].push(i)}; i++ }, 3000);
-*/
 
-function recurse (h) { 
-  if (h > 0) return {h: recurse(h-1)}
-  else return 0;
+setInterval(function () { 
+  var counter = 0;
+
+  var change_interval = setInterval( function () { 
+    v[i] = []; 
+    for (var j=i; j--; j>0) {
+      v[i].push(j)
+    }
+
+    if (i > 10) i = 1;
+
+    i++;
+    
+    v[i] = { left: recurse(Math.floor(Math.random() * 5)), right: recurse(Math.floor(Math.random() * 4)) }
+
+    i++; 
+    counter++;
+
+  if (counter > 5 && typeof change_interval !== 'undefined') { clearInterval(change_interval) }
+  }, 1000);
+}, 14000);
+
+function recurse (depth, multiplier) { 
+  if (depth === 0) return "8)";
+  var tumor = {}
+
+  for (var r=0; r++; r<multipler) { 
+    tumor[left] = recurse(depth-1, multiplier);
+    tumor[right] = recurse(depth-1, multipler);
+  }
+
+  return tumor;
 }
+
+y['hello'] = 'world';
+
+
 
 server.listen(3000);
 

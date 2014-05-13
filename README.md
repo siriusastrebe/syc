@@ -45,5 +45,5 @@ Now syc will be able to sync variables with this client.
 - - - 
 This library is a work in progress. Next release features: Client -> Server synchronization, Watchers, and an Object.observe shim for non ECMA-7 clients and servers. 
 
-Syc currently supports the primitive types numbers, strings, booleans, as well as dates and regular expressions. Syc also supports Objects, Arrays, any any recursive combination of the two. If you would like to see additional types supported by Syc, please send an email to https://github.com/siriusastrebe
+Syc currently supports the primitive types numbers, strings, booleans, as well as dates and regular expressions. Syc also supports Objects, Arrays, any any recursive combination of the two. If you would like to see additional types supported by Syc, please send an email to siriusastrebe@gmail.com
 

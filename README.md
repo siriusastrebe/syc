@@ -34,6 +34,11 @@ Syc utilizes socket.io but isn't a wrapper for it. So you'll have to initalize i
       syc.connect(socket);
     });
 
+And on the client:
+
+    var socket = io.connect();
+    Syc.connect(socket);
+
 Now syc will be able to sync variables with this client.
 
 

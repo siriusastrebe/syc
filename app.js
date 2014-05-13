@@ -9,7 +9,7 @@ var express = require('express'),
     http = require('http'),
     path = require('path'),
     socket = require('socket.io'),
-    syc = require('./private/syc');
+    syc = require('./server/syc');
 
 var app = express(),
     server = http.createServer(app),
@@ -70,23 +70,21 @@ setInterval(function () {
 
     i++;
     
-    v[i] = { left: recurse(Math.floor(Math.random() * 5)), right: recurse(Math.floor(Math.random() * 4)) }
+    v[i] = { left: recurse(Math.floor(Math.random() * 5)), right: recurse(Math.floor(Math.random() * 5)) }
 
     i++; 
     counter++;
 
-  if (counter > 5 && typeof change_interval !== 'undefined') { clearInterval(change_interval) }
+  if (counter > 5) { clearInterval(change_interval) }
   }, 1000);
-}, 14000);
+}, 12000);
 
-function recurse (depth, multiplier) { 
+function recurse (depth) { 
   if (depth === 0) return "8)";
   var tumor = {}
 
-  for (var r=0; r++; r<multipler) { 
-    tumor[left] = recurse(depth-1, multiplier);
-    tumor[right] = recurse(depth-1, multipler);
-  }
+  tumor['left'] = recurse(depth-1);
+  tumor['right'] = recurse(depth-1);
 
   return tumor;
 }

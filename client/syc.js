@@ -43,8 +43,6 @@ var Syc = {
         id = data.id,
         properties = data.properties;
 
-//    console.log(id); console.log(properties); console.log(' - ');
-
     if (id in Syc.objects) throw 'Add Error: Object by id ' + id + ' already exists.';
     Syc.objects[id] = variable;
 
@@ -63,7 +61,6 @@ var Syc = {
     var variable = Syc.objects[id];
 
     variable[property] = Syc.Type(type, value);
-//    console.log(Syc.Type(type, value));
 
     if (variable[property] === undefined) { 
       if (type === 'object' || type === 'array') { 

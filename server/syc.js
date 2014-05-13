@@ -1,4 +1,6 @@
 var connected = [];
+var object_to_variables = {};
+
 
 Syc = {
   connect: function (socket) { 

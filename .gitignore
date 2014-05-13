@@ -7,6 +7,8 @@ package.json
 node_modules
 routes
 views
+tests
 
 client/images
 client/stylesheets
+

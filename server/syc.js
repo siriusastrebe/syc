@@ -1,11 +1,10 @@
 var connected = [];
-var object_to_variables = {};
-
+var observe_lock = {};
 
 Syc = {
   connect: function (socket) { 
     connected.push(socket);
-    socket.on('syc-object-request', Object_Request) 
+    socket.on('syc-object-change', function (data) { console.log(data); Receive_Object(data, socket)}) 
     Reset(socket);
   },
   
@@ -35,14 +34,17 @@ function InvalidTypeError (type) {
 }
 
 
-var a = 0;
-
 // ---- ---- ---- ----  Observe  ---- ---- ---- ----
 function Observed (changes) { 
   for (change in changes) { 
     var property = changes[change].name,
         variable = changes[change].object[property],
-        id;
+        id = changes[change].object['syc-object-id'];
+
+    if (id in observe_lock) {
+      delete observe_lock[id];
+      continue;
+    }
 
     if (toType(changes[change].object) === 'array' && property === 'length') continue;
     
@@ -53,8 +55,6 @@ function Observed (changes) {
         type.value = Track_Object(variable);
       }
     }
-
-    id = changes[change].object['syc-object-id'];
     
     Emit('syc-object-change', { id: id, property: property, type: type.type, value: type.value });
   }
@@ -94,6 +94,15 @@ function Emit (title, data, sockets) {
   });
 }
 
+function Broadcast (title, data, sender) { 
+  var audience = connected.slice(0); // create a clone so we don't tamper the original
+  audience.splice(audience.indexOf(sender), 1);
+
+  audience.forEach( function (socket) { 
+    soket.emit(title, data);
+  });
+}
+
 function Name (name, variable) { 
   var id = variable['syc-object-id'];
 
@@ -117,8 +126,6 @@ function Track_Object(variable) {
   var id = Meta(variable),
       data;
 
-  Object.observe(variable, Observed);
-
   for (property in variable) {
     type = Type(variable[property]);
 
@@ -127,22 +134,21 @@ function Track_Object(variable) {
     }
   }
 
-  data = Map_Object(id);
+  data = Describe_Object(id);
 
   Emit('syc-object-create', data);
 
   return id;
 }
 
-function Meta (variable) {
-  var id = token();
-  while (id in Syc.objects) {
-    id = token();
-  }
+function Meta (variable, id) {
+  var id = id || token();
 
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
 
   Syc.objects[id] = variable;
+
+  if (Object.observe) Object.observe(variable, Observed);
 
   function token () {
     function rand () { return Math.random().toString(36).substr(2) }
@@ -152,7 +158,7 @@ function Meta (variable) {
   return id;
 }
 
-function Map_Object (id) { 
+function Describe_Object (id) { 
   var variable = Syc.objects[id],
       properties = {};
 
@@ -166,6 +172,130 @@ function Map_Object (id) {
 }
 
 
+
+
+// ---- ---- ---- ---- Recieving ---- ---- ---- ----
+
+function Receive_Object (data, socket) { 
+  var type     = data.type,
+      id       = data.id,
+      property = data.property
+      changes   = data.changes;
+
+  var variable = Syc.objects[id];
+
+  if (variable === undefined)
+    throw "Received changes to an unknown object: " + id;
+
+  observe_lock[id] = true;
+
+  variable[property] = Resolve(changes);
+}
+
+function Resolve (changes) { 
+  var type = changes.type,
+      properties,
+      value,
+      id; 
+   
+  if (type === 'object' || type === 'array') { 
+    var properties = changes.properties,
+        id         = changes.id;
+
+    if (id in Syc.objects) { 
+      return Syc.objects[id];
+    } else { 
+
+      variable = { };
+      id = Meta(variable, id);
+
+      for (property in properties) {
+        variable[property] = Resolve(properties[property])
+      }
+
+      return variable;
+    }
+  } else { 
+    value = changes.value;
+    return Evaluate(type, value);
+  }
+}
+
+function Evaluate (type, value) { 
+  if (type === 'string')   return value;
+  if (type === 'number')   return Number(value);
+  if (type === 'boolean')  return value === 'true';
+  if (type === 'date')     return JSON.parse(value);
+  if (type === 'regexp')   return new RegExp(value);
+
+  if (type === 'object' || type === 'array') {
+    return Syc.objects[value];
+  }
+
+  throw 'Object type ' + type + ' not supported by syc';
+}
+
+// ---- ---- ---- ----  Traversals  ---- ---- ---- ----
+/*
+var timer;
+
+function Start_Map () { 
+  if (timer === undefined) { 
+    timer = setInterval(Mapper, 500);
+  }
+}
+
+function Mapper () { 
+  var unmarked_objects = Syc.objects;
+
+  for (variable in Syc.variables) {
+    Traverse(Syc.variables[variable], variable, [])
+  }
+
+  // Garbage Collect 
+  for (object in unmarked_objects) {
+    var id = unmarked_objects[object]['syc-object-id'];
+    Emit('syc-variable-delete', {id: id});
+    delete Syc.objects[object];
+  }
+}
+
+function Traverse (object, variable, pathway) { 
+  var id = object['syc-variable-id'];
+
+  if (id === undefined) { 
+    id = Track_Object(object);
+    if (Object.observe)
+      console.log('Syc warning: New object bypassed by Object.observe. Id: ' + id); 
+  }
+
+  // Bookkeeping 
+  if (object_to_variable_map[id] === undefined)
+    object_to_variable_map[id] = [];
+ 
+  object_to_variable_map[id].push(variable);
+
+  delete unmarked_objects[id];
+
+  // Traversal 
+  for (property in object) {
+    var element = object[property],
+        type = Type(element);
+
+    if (type.type === 'object' || type.type === 'array') {
+      Traverse(element, variable, pathway.slice(0).push(property));
+    }
+  }
+}
+
+function Compare (a, b) { 
+  for (property in a) { 
+    
+  }
+}
+*/
+
+
 // ---- ---- ---- ----  Requests  ---- ---- ---- ----
 function Reset (socket) { 
   for (variable in Syc.variables) {
@@ -175,16 +305,9 @@ function Reset (socket) {
   for (object in Syc.objects) { 
     var object = Syc.objects[object];
 
-    Emit('syc-object-create', Map_Object(object['syc-object-id']), [socket]);
+    Emit('syc-object-create', Describe_Object(object['syc-object-id']), [socket]);
   }
 }
-
-
-function Object_Request (data) {
-  Emit('syc-object-create', Map_Object(data.id), [socket]);
-}
-
-
 
 
 

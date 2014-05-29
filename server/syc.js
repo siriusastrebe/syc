@@ -4,13 +4,12 @@ var observe_lock = {};
 Syc = {
   connect: function (socket) { 
     connected.push(socket);
-    socket.on('syc-object-change', function (data) { console.log(data); Receive_Object(data, socket)}) 
+    socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
     Reset(socket);
   },
   
   sync: function (name) {
     Verify(this);
-    Track_Object(this);
     Name(name, this);
   },
 
@@ -34,57 +33,7 @@ function InvalidTypeError (type) {
 }
 
 
-// ---- ---- ---- ----  Observe  ---- ---- ---- ----
-function Observed (changes) { 
-  for (change in changes) { 
-    var property = changes[change].name,
-        variable = changes[change].object[property],
-        id = changes[change].object['syc-object-id'];
-
-    if (id in observe_lock) {
-      delete observe_lock[id];
-      continue;
-    }
-
-    if (toType(changes[change].object) === 'array' && property === 'length') continue;
-    
-    var type = Type(variable);
-    
-    if (type.type === 'object' || type.type === 'array') { 
-      if (type.value === undefined) {
-        type.value = Track_Object(variable);
-      }
-    }
-    
-    Emit('syc-object-change', { id: id, property: property, type: type.type, value: type.value });
-  }
-}
-
-
-// ---- ---- ---- ----  Helpers  ---- ---- ---- ----
-function Type (variable) { 
-  var type = toType(variable),
-      value;
-
-  if      (type === 'string')   value = variable;
-  else if (type === 'number')   value = variable.toString();
-  else if (type === 'boolean')  value = variable ? 'true' : 'false';
-  else if (type === 'date')     value = JSON.stringify(variable);
-  else if (type === 'regexp')   value = variable.toString();
-  else if (type === 'array' || type === 'object') {
-    value = variable['syc-object-id'];
-  }
-  else throw InvalidTypeError(type);
-
-  return {type: type, value: value}
-}
-
-// Better type checking, stolen from: 
-// http://javascriptweblog.wordpress.com/2011/08/08/fixing-the-javascript-typeof-operator/
-function toType (obj) {
-  return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
-}
-
+// ---- ---- ---- ----  Helper  ---- ---- ---- ----
 
 function Emit (title, data, sockets) { 
   var audience = sockets || connected;
@@ -96,24 +45,14 @@ function Emit (title, data, sockets) {
 
 function Broadcast (title, data, sender) { 
   var audience = connected.slice(0); // create a clone so we don't tamper the original
+
   audience.splice(audience.indexOf(sender), 1);
 
   audience.forEach( function (socket) { 
-    soket.emit(title, data);
+    socket.emit(title, data);
   });
 }
 
-function Name (name, variable) { 
-  var id = variable['syc-object-id'];
-
-  if (!(name in Syc.variables)) { 
-    Object.defineProperty(variable, 'syc-variable-name', {value: name, enumerable: false});
-
-    Syc.variables[name] = id;
-  } else throw DuplicateNameError(name)
-
-  Emit('syc-variable-new', {name: name, id: id});
-}
 
 function Verify (variable) { 
   if ( !(variable instanceof Syc.sync) )  
@@ -121,56 +60,62 @@ function Verify (variable) {
 }
 
 
-/* ---- ---- ---- ----  Objects  ---- ---- ---- ---- */
-function Track_Object(variable) { 
-  var id = Meta(variable),
-      data;
+/* ---- ---- ---- ----  Observing and New Variables  ---- ---- ---- ---- */
+function Name (name, variable) { 
+  if (name in Syc.variables) throw DuplicateNameError(name);
 
-  for (property in variable) {
-    type = Type(variable[property]);
+  Object.defineProperty(variable, 'syc-variable-name', {value: name, enumerable: false});
+  id = Meta(variable);
+  Syc.variables[name] = id;
 
-    if ((type.type === 'object' || type.type === 'array') && type.value === undefined) {
-      Track_Object(variable[property]);
+  var data = Describe(variable);
+
+  Emit('syc-variable-new', {name: name, id: id, data: data});
+}
+
+function Observed (changes) { 
+  for (change in changes) { 
+    var object = changes[change].object,
+        property = changes[change].name,
+        changed = object[property],
+        type = changes[change].type,
+        id = object['syc-object-id'];
+
+    if (id in observe_lock) {
+      delete observe_lock[id];
+      return ;
     }
+
+    var changes = Describe(changed);
+
+    Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
-
-  data = Describe_Object(id);
-
-  Emit('syc-object-create', data);
-
-  return id;
 }
 
-function Meta (variable, id) {
-  var id = id || token();
+function Describe (variable) { 
+  var type = Type(variable),
+      value = Evaluate(type, variable);
 
-  Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
+  if (type === 'object' || type === 'array') { 
+    id = variable['syc-object-id'];
 
-  Syc.objects[id] = variable;
+    if (id === undefined) { 
+      var properties = {};
 
-  if (Object.observe) Object.observe(variable, Observed);
+      for (property in variable) {
+        properties[property] = Describe(variable[property]);
+      }
 
-  function token () {
-    function rand () { return Math.random().toString(36).substr(2) }
-    return rand() + rand();
+      id = Meta(variable);
+
+      return {type: type, id: id, properties: properties};
+    } else { 
+      return {type: type, id: id};
+    }
+  } else { 
+    return {type: type, value: value};
   }
-
-  return id;
 }
-
-function Describe_Object (id) { 
-  var variable = Syc.objects[id],
-      properties = {};
-
-  if (variable === undefined) throw 'Request for unknown variable ' + id;
-
-  for (property in variable) {
-    properties[property] = Type(variable[property])
-  }
-
-  return { id: id, properties: properties }
-}
-
 
 
 
@@ -189,29 +134,39 @@ function Receive_Object (data, socket) {
 
   observe_lock[id] = true;
 
-  variable[property] = Resolve(changes);
+  if (type === 'add' || type === 'update') { 
+    variable[property] = Resolve(changes);
+  } else if (type === 'delete') { 
+    delete variable[property];
+  } else { 
+    throw 'Recieved changes for an unknown change type: ' + type;
+  } 
+
+  Broadcast('syc-object-change', data, socket);;
 }
 
 function Resolve (changes) { 
   var type = changes.type,
+      variable,
       properties,
       value,
       id; 
    
   if (type === 'object' || type === 'array') { 
-    var properties = changes.properties,
-        id         = changes.id;
+    properties = changes.properties,
+    id         = changes.id;
 
     if (id in Syc.objects) { 
       return Syc.objects[id];
     } else { 
-
-      variable = { };
-      id = Meta(variable, id);
-
+      if (type === 'object') variable = {};
+      if (type === 'array') variable = [];
+      
       for (property in properties) {
         variable[property] = Resolve(properties[property])
       }
+
+      id = Meta(variable, id);
 
       return variable;
     }
@@ -219,6 +174,30 @@ function Resolve (changes) {
     value = changes.value;
     return Evaluate(type, value);
   }
+}
+
+
+// ---- ---- ---- ----  Object Conversion  ----- ---- ---- ---- 
+function Meta (variable, id) {
+  var id = id || token();
+
+  Syc.objects[id] = variable;
+  Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
+  if (Object.observe) Object.observe(variable, Observed);
+
+  function token () { 
+    // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
+    function rand () { return Math.random().toString(36).substr(2) }
+    var toke = rand() + rand();
+    if (toke in Syc.objects) return token();
+    else return toke;
+  }
+
+  return id;
+}
+
+function Type (obj) { 
+  return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
 }
 
 function Evaluate (type, value) { 
@@ -232,83 +211,41 @@ function Evaluate (type, value) {
     return Syc.objects[value];
   }
 
+  if (type === 'undefined') return undefined;
+
   throw 'Object type ' + type + ' not supported by syc';
 }
 
-// ---- ---- ---- ----  Traversals  ---- ---- ---- ----
-/*
-var timer;
-
-function Start_Map () { 
-  if (timer === undefined) { 
-    timer = setInterval(Mapper, 500);
-  }
-}
-
-function Mapper () { 
-  var unmarked_objects = Syc.objects;
-
-  for (variable in Syc.variables) {
-    Traverse(Syc.variables[variable], variable, [])
-  }
-
-  // Garbage Collect 
-  for (object in unmarked_objects) {
-    var id = unmarked_objects[object]['syc-object-id'];
-    Emit('syc-variable-delete', {id: id});
-    delete Syc.objects[object];
-  }
-}
-
-function Traverse (object, variable, pathway) { 
-  var id = object['syc-variable-id'];
-
-  if (id === undefined) { 
-    id = Track_Object(object);
-    if (Object.observe)
-      console.log('Syc warning: New object bypassed by Object.observe. Id: ' + id); 
-  }
-
-  // Bookkeeping 
-  if (object_to_variable_map[id] === undefined)
-    object_to_variable_map[id] = [];
- 
-  object_to_variable_map[id].push(variable);
-
-  delete unmarked_objects[id];
-
-  // Traversal 
-  for (property in object) {
-    var element = object[property],
-        type = Type(element);
-
-    if (type.type === 'object' || type.type === 'array') {
-      Traverse(element, variable, pathway.slice(0).push(property));
-    }
-  }
-}
-
-function Compare (a, b) { 
-  for (property in a) { 
-    
-  }
-}
-*/
-
 
 // ---- ---- ---- ----  Requests  ---- ---- ---- ----
+
 function Reset (socket) { 
-  for (variable in Syc.variables) {
-    Emit('syc-variable-new', {name: variable, id: Syc.variables[variable]}, [socket]);
-  }
+  for (name in Syc.variables) {
+    var id = Syc.variables[name],
+        variable = Syc.objects[id];
 
-  for (object in Syc.objects) { 
-    var object = Syc.objects[object];
-
-    Emit('syc-object-create', Describe_Object(object['syc-object-id']), [socket]);
+    Emit('syc-variable-new', {name: name, id: id, description: Recursive_Describe (variable)  }, [socket]);
   }
 }
 
+function Recursive_Describe (variable) {
+  var description = Describe(variable),
+      type = description.type,
+      id = description.id,
+      properties;
+  
+  if (type === 'object' || type === 'array') { 
+    properties = {};
+
+    for (property in variable) { 
+      properties[property] = Recursive_Describe(variable[property]);
+    }
+    
+    return { type: type, id: id, properties: properties }
+  } else { 
+    return { type: type, value: description.value }
+  } 
+}
 
 
 module.exports = Syc;

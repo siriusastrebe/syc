@@ -28,6 +28,7 @@ You can change the data on either the server or the client and see it reflected 
     synced.goodbye = "farewell!"
 
 
+
     synced.goodbye
     -> "farewell!"
 

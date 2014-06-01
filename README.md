@@ -22,6 +22,13 @@ The client will be able to access this variable by getting the reference to it:
     var synced = syc.list('name')
     synced.hello
     -> "world"
+    
+You can change the data on either the server or the client and see it reflected elsewhere.
+    
+    synced.goodbye = "farewell!"
+
+    synced.goodbye
+    -> "farewell!"
 
 ## Setting up Syc
 

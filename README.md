@@ -7,7 +7,7 @@ Syc allows you to create a variable which, when modified on the server, will ref
 
 Like Meteor, but without the framework.
 
-** Currently, Syc uses Object.observe and requires ECMA 7 on the server side to operate. Update Node.js to latest and run using the harmony flag: `node --harmony app.js` **
+** Currently, Syc uses Object.observe and requires ECMA 7 on the server and client to operate. Update Node.js to latest and run using the harmony flag: `node --harmony app.js` **
 
 
 ## Syncing a variable (Server side)
@@ -43,7 +43,7 @@ Now syc will be able to sync variables with this client.
 
 
 - - - 
-This library is a work in progress. Next release features: Client -> Server synchronization, Watchers, and an Object.observe shim for non ECMA-7 clients and servers. 
+This library is a work in progress. Latest feature: Client -> Server synchronization.
+Planned features: Server -> Client one way synchronization, an Object.observe shim for non ECMA-7 clients and servers, watchers, and verifiers.
 
-Syc currently supports the primitive types numbers, strings, booleans, as well as dates and regular expressions. Syc also supports Objects, Arrays, any any recursive combination of the two. If you would like to see additional types supported by Syc, please send an email to siriusastrebe@gmail.com
-
+Syc currently supports circular data structures.

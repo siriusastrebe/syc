@@ -23,11 +23,11 @@ The client will be able to access this variable by getting the reference to it:
     synced.hello
     -> "world"
     
-You can change the data on either the server or the client and see it reflected elsewhere.
+You can change the data on either the server or the client...
     
     synced.goodbye = "farewell!"
 
-
+And see the change reflected on every other client.
 
     synced.goodbye
     -> "farewell!"

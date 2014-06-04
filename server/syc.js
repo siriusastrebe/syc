@@ -220,32 +220,107 @@ function Evaluate (type, value) {
 // ---- ---- ---- ----  Requests  ---- ---- ---- ----
 
 function Reset (socket) { 
+  var described = {};
+
   for (name in Syc.variables) {
     var id = Syc.variables[name],
         variable = Syc.objects[id];
 
     Emit('syc-variable-new', {name: name, id: id, description: Recursive_Describe (variable)  }, [socket]);
   }
-}
 
-function Recursive_Describe (variable) {
-  var description = Describe(variable),
-      type = description.type,
-      id = description.id,
-      properties;
-  
-  if (type === 'object' || type === 'array') { 
-    properties = {};
-
-    for (property in variable) { 
-      properties[property] = Recursive_Describe(variable[property]);
-    }
+  function Recursive_Describe (variable) {
+    var description = Describe(variable),
+        type = description.type,
+        id = description.id,
+        properties;
     
-    return { type: type, id: id, properties: properties }
-  } else { 
-    return { type: type, value: description.value }
-  } 
+    if (type === 'object' || type === 'array') { 
+
+      if (id in described) return { type: type, id: id }
+      described[id] = true;
+
+      properties = {};
+
+      for (property in variable) { 
+        properties[property] = Recursive_Describe(variable[property]);
+      }
+      
+      return { type: type, id: id, properties: properties }
+    } else { 
+      return { type: type, value: description.value }
+    } 
+  }
 }
+
+
+// ---- ---- ---- ----  Traversals  ---- ---- ---- ----
+
+/*
+  Garbage Collection (mark, sweep)
+  Polyfill
+  Verifier
+*/
+var Object_to_Variables = {};
+var Object_Mapping = {};
+
+function Map { 
+  var Marked = Syc.objects;
+
+  for (name in Syc.variables) { 
+    Traverse(Syc.variables[name]);
+  }
+
+  // Garbage Collect
+  for (unvisited in Marked) {
+    delete Syc.objects[unvisited];
+  }
+
+  function Traverse (object) { 
+    var id = object['syc-object-id'];
+
+    if (id === undefined) { 
+      // addition
+    } else { 
+      delete Marked[id];
+
+      if (Object_to_Variables[id] === undefined) Object_to_Variables[id] = [];
+      Object_to_Variables[id].push(object);
+
+      for (property in object) { 
+        if (property in Object_Mapping[id]) { 
+          var new_type = Type(object[property]),
+              new_value = Evaluate(new_type, object[property]),
+              old_type = Type(Object_Mapping[id][property]),
+              old_value = Type(old_type, Object_Mapping[id][property]);
+
+          if (new_type !== old_type || new_value !== old_value) {
+            
+            // change
+          }
+        } else { 
+          // addition
+        }
+
+        // Syncing the Map
+        Object_Mapping[id][property] = object[property];
+
+        // recursion 
+      }
+
+      for (property in Object_Mapping[id]) { 
+        if (!(property in object) { 
+          // deletion
+        }
+      }
+    }
+
+    return id;
+  }
+}
+
+
 
 
 module.exports = Syc;
+

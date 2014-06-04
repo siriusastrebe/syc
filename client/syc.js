@@ -19,7 +19,18 @@ var Syc = {
     }
   },
 
+/*
+  watchers: {},
+
+  watch: function (name, watcher) { 
+    if (Syc.watchers[name] === undefined) Syc.watchers = [];
+
+    Syc.watchers[name].push(watcher) {
+  },
+*/
+
   List: function (argument) { return Syc.list(argument) },
+
 
   variables: {},
   objects: {},
@@ -57,7 +68,7 @@ var Syc = {
     } else if (type === 'delete') { 
       delete variable[property];
     } else { 
-      console.log('Received changes for an unknown change type: ' + type);
+      throw 'Received changes for an unknown change type: ';
     }
   },
 

@@ -265,55 +265,72 @@ var Object_to_Variables = {};
 var Object_Mapping = {};
 
 function Map { 
-  var Marked = Syc.objects;
+  var Visited = {},
+      Marked = Syc.objects;
+      
 
   for (name in Syc.variables) { 
     Traverse(Syc.variables[name]);
   }
 
+/*
   // Garbage Collect
   for (unvisited in Marked) {
     delete Syc.objects[unvisited];
   }
+*/
 
-  function Traverse (object) { 
+  function Traverse (object, variable) { 
     var id = object['syc-object-id'];
 
     if (id === undefined) { 
-      // addition
+      id = null;// addition
     } else { 
-      delete Marked[id];
-
-      if (Object_to_Variables[id] === undefined) Object_to_Variables[id] = [];
-      Object_to_Variables[id].push(object);
-
+      var map = Object_Mapping[id];
       for (property in object) { 
-        if (property in Object_Mapping[id]) { 
-          var new_type = Type(object[property]),
-              new_value = Evaluate(new_type, object[property]),
-              old_type = Type(Object_Mapping[id][property]),
-              old_value = Type(old_type, Object_Mapping[id][property]);
+        if (!(id in Object_to_Variables) || Object_to_variables[id].indexOf(variable) === -1) { 
+          var current = Describe(object[property]);
 
-          if (new_type !== old_type || new_value !== old_value) {
-            
+          if (property in map) { 
+            var previous = map[property],
+            delete map[property];
+
             // change
+            if (current.type !== old.type) {
+              Observation();
+            }
+            else if (current.type === 'object' || current.type === 'array') {
+              if (current.id !== old.id) {
+                Observation();
+              }
+            } else { 
+              if (current.value !== old.value) {
+                Observation();
+              }
+            }
+
+          } else { 
+            // Addition
+            Observation();
           }
-        } else { 
-          // addition
+           
+          map[property] = current;
+
+          if (current.type === 'object' || current.type === 'array') { 
+            Traverse(object[property], variable)
+          }
         }
 
-        // Syncing the Map
-        Object_Mapping[id][property] = object[property];
-
-        // recursion 
-      }
-
-      for (property in Object_Mapping[id]) { 
-        if (!(property in object) { 
+        for (property in map) { 
           // deletion
+          Observation();
         }
       }
     }
+
+    // Object to Variables
+    if (Object_to_Variables[id] === undefined) Object_to_Variables[id] = [];
+    Object_to_Variables[id].push(variable);
 
     return id;
   }

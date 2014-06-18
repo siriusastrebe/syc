@@ -1,11 +1,15 @@
 var connected = [];
 var observe_lock = {};
+var Object_Mapping = {};
+var mapping_timer;
 
 Syc = {
   connect: function (socket) { 
     connected.push(socket);
     socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
     Reset(socket);
+    
+    if (!mapping_timer) mapping_timer = setInterval(Map, 3000);
   },
   
   sync: function (name) {
@@ -68,10 +72,11 @@ function Name (name, variable) {
   id = Meta(variable);
   Syc.variables[name] = id;
 
-  var data = Describe(variable);
+  var data = Describe_Untracked(variable);
 
   Emit('syc-variable-new', {name: name, id: id, data: data});
 }
+
 
 function Observed (changes) { 
   for (change in changes) { 
@@ -82,16 +87,19 @@ function Observed (changes) {
         id = object['syc-object-id'];
 
     if (id in observe_lock) {
-      delete observe_lock[id];
-      return ;
+      delete observe_lock[id]; return
     }
 
-    var changes = Describe(changed);
+    var changes = Describe_Untracked(changed);
+
+    Object_Mapping[id] = changes;
 
     Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
 }
 
+
+/* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
 function Describe (variable) { 
   var type = Type(variable),
       value = Evaluate(type, variable);
@@ -99,14 +107,30 @@ function Describe (variable) {
   if (type === 'object' || type === 'array') { 
     id = variable['syc-object-id'];
 
+    if (id === undefined) 
+      id = Meta(variable);
+    
+    return {type: type, id: id};
+  } else { 
+    return {type: type, value: value};
+  }
+}
+
+function Describe_Untracked (variable) { 
+  var type = Type(variable),
+      value = Evaluate(type, variable);
+
+  if (type === 'object' || type === 'array') { 
+    id = variable['syc-object-id'];
+
     if (id === undefined) { 
+      id = Meta(variable);
+
       var properties = {};
 
       for (property in variable) {
-        properties[property] = Describe(variable[property]);
+        properties[property] = Describe_Untracked(variable[property]);
       }
-
-      id = Meta(variable);
 
       return {type: type, id: id, properties: properties};
     } else { 
@@ -117,9 +141,34 @@ function Describe (variable) {
   }
 }
 
+function Describe_Recursive (variable, visited) { 
+  var type = Type(variable),
+      value = Evaluate(type, variable);
 
+  if (type === 'object' || type === 'array') { 
+    id = variable['syc-object-id'];
 
-// ---- ---- ---- ---- Recieving ---- ---- ---- ----
+    if (visited === undefined) var visited = [];
+    if (visited.indexOf(id) !== -1) 
+      return;
+    visited.push(id);
+
+    if (id === undefined) 
+      id = Meta(variable);
+    
+    var properties = {};
+
+    for (property in variable) {
+      properties[property] = Describe_Recursive(variable[property], visited);
+    }
+
+    return {type: type, id: id, properties: properties};
+  } else { 
+    return {type: type, value: value};
+  }
+
+}
+
 
 function Receive_Object (data, socket) { 
   var type     = data.type,
@@ -180,10 +229,12 @@ function Resolve (changes) {
 // ---- ---- ---- ----  Object Conversion  ----- ---- ---- ---- 
 function Meta (variable, id) {
   var id = id || token();
+  Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
 
   Syc.objects[id] = variable;
-  Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
   if (Object.observe) Object.observe(variable, Observed);
+  
+  Object_Mapping[id] = Describe(variable);
 
   function token () { 
     // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
@@ -226,30 +277,7 @@ function Reset (socket) {
     var id = Syc.variables[name],
         variable = Syc.objects[id];
 
-    Emit('syc-variable-new', {name: name, id: id, description: Recursive_Describe (variable)  }, [socket]);
-  }
-
-  function Recursive_Describe (variable) {
-    var description = Describe(variable),
-        type = description.type,
-        id = description.id,
-        properties;
-    
-    if (type === 'object' || type === 'array') { 
-
-      if (id in described) return { type: type, id: id }
-      described[id] = true;
-
-      properties = {};
-
-      for (property in variable) { 
-        properties[property] = Recursive_Describe(variable[property]);
-      }
-      
-      return { type: type, id: id, properties: properties }
-    } else { 
-      return { type: type, value: description.value }
-    } 
+    Emit('syc-variable-new', {name: name, id: id, description: Describe_Recursive(variable)}, [socket]);
   }
 }
 
@@ -261,16 +289,22 @@ function Reset (socket) {
   Polyfill
   Verifier
 */
-var Object_to_Variables = {};
-var Object_Mapping = {};
+var Object_Ownership = {};
 
-function Map { 
+function Map () { 
+  /* Traversal has four purposes
+  * 1) Act as a polyfill for Object.observe
+  * 2) Create a mapping of Object to Variables for use in Watchers
+  * 3) Garbage collection of unreferenced objects
+  * 4) 
+  * As such, it's this is a real friggin big function, so I've tried to abstract out each piece as much as I can.
+  */
   var Visited = {},
       Marked = Syc.objects;
       
 
   for (name in Syc.variables) { 
-    Traverse(Syc.variables[name]);
+    Traverse(Syc.objects[Syc.variables[name]]);
   }
 
 /*
@@ -283,56 +317,61 @@ function Map {
   function Traverse (object, variable) { 
     var id = object['syc-object-id'];
 
-    if (id === undefined) { 
-      id = null;// addition
-    } else { 
-      var map = Object_Mapping[id];
-      for (property in object) { 
-        if (!(id in Object_to_Variables) || Object_to_variables[id].indexOf(variable) === -1) { 
-          var current = Describe(object[property]);
+    if (!(id in Object_Ownership) || Object_Ownership[id].indexOf(variable) === -1) {  // Prevent cycling
+      Check_Changes(object, variable);
+    }
 
-          if (property in map) { 
-            var previous = map[property],
-            delete map[property];
+    // Object to Variables
+    if (Object_Ownership[id] === undefined) Object_Ownership[id] = [];
+    Object_Ownership[id].push(variable);
 
-            // change
-            if (current.type !== old.type) {
-              Observation();
-            }
-            else if (current.type === 'object' || current.type === 'array') {
-              if (current.id !== old.id) {
-                Observation();
-              }
-            } else { 
-              if (current.value !== old.value) {
-                Observation();
-              }
-            }
+    return id;
+  }
 
-          } else { 
-            // Addition
-            Observation();
-          }
-           
-          map[property] = current;
+  function Check_Changes (object, variable) { 
+    var id = object['syc-object-id'];
 
-          if (current.type === 'object' || current.type === 'array') { 
-            Traverse(object[property], variable)
-          }
+    var map = JSON.parse( JSON.stringify(Object_Mapping[id]) ); // Clone this object
+
+    for (property in object) { 
+      var current = Describe(object[property]);
+      console.log(current);
+
+      if (property in map) { 
+        var previous = map[property];
+        delete map[property];
+
+        if ((current.type !== previous.type) || 
+           ((current.type === 'object' || current.type === 'array') && (current.id !== old.id)) ||
+           (current.value != previous.value)) 
+        {
+          Observation(property, 'update', object, previous);
         }
+      } else { 
+        Observation(property, 'add', object);
+      }
+       
+      Object_Mapping[id][property] = current;
 
-        for (property in map) { 
-          // deletion
-          Observation();
+      if (current.type === 'object' || current.type === 'array') { 
+        if (object[property]['syc-object-id'] !== undefined) { 
+          Traverse(object[property], variable)
+        } else { 
+          Observation(property, 'add', object);
+          Traverse(object[property], variable);
         }
       }
     }
 
-    // Object to Variables
-    if (Object_to_Variables[id] === undefined) Object_to_Variables[id] = [];
-    Object_to_Variables[id].push(variable);
+    for (property in map) { 
+      Observation(property, 'delete', object, map[property]);
+      
+      delete Object_Mapping[id][property];
+    }
+  }
 
-    return id;
+  function Observation (name, type, object, oldValue) { 
+    Observed([{name: name, type: type, object: object, oldValue: oldValue}]);
   }
 }
 

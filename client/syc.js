@@ -43,6 +43,7 @@ var Syc = {
         id = data.id,
         description = data.description;
 
+    console.log(data);
     Syc.variables[name] = id;
 
     var variable = Syc.Resolve(description);
@@ -51,10 +52,10 @@ var Syc = {
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
 
   Receive_Object: function (data) { 
-    var type     = data.type,
-        id       = data.id,
-        property = data.property
-        changes   = data.changes;
+    var change_type = data.change_type,
+        id          = data.id,
+        property    = data.property
+        changes     = data.changes;
 
     var variable = Syc.objects[id];
 
@@ -63,12 +64,12 @@ var Syc = {
 
     Syc.observe_lock[id] = true;
 
-    if (type === 'add' || type === 'update') { 
+    if (change_type === 'add' || change_type === 'update') { 
       variable[property] = Syc.Resolve(changes)
-    } else if (type === 'delete') { 
+    } else if (change_type === 'delete') { 
       delete variable[property];
     } else { 
-      throw 'Received changes for an unknown change type: ';
+      throw 'Received changes for an unknown change type: ' + change_type;
     }
   },
 

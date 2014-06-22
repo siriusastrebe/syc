@@ -9,7 +9,7 @@ Syc = {
     socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
     Reset(socket);
     
-    if (!mapping_timer) mapping_timer = setInterval(Map, 3000);
+    //if (!mapping_timer) mapping_timer = setInterval(Map, 3001);
   },
   
   sync: function (name) {
@@ -72,9 +72,9 @@ function Name (name, variable) {
   id = Meta(variable);
   Syc.variables[name] = id;
 
-  var data = Describe_Untracked(variable);
+  var description= Describe_Recursive(variable);
 
-  Emit('syc-variable-new', {name: name, id: id, data: data});
+  Emit('syc-variable-new', {name: name, id: id, description: description});
 }
 
 
@@ -83,7 +83,7 @@ function Observed (changes) {
     var object = changes[change].object,
         property = changes[change].name,
         changed = object[property],
-        type = changes[change].type,
+        change_type = Standardize_Change_Type(changes[change].type),
         id = object['syc-object-id'];
 
     if (id in observe_lock) {
@@ -94,19 +94,24 @@ function Observed (changes) {
 
     Object_Mapping[id] = changes;
 
-    Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
+    Emit('syc-object-change', { id: id, change_type: change_type, property: property, changes: changes });
   }
 }
 
+function Standardize_Change_Type (type) { 
+  if (type === 'updated') return 'update';
+  if (type === 'new') return 'add';
+
+  return type;
+}
 
 /* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
 function Describe (variable) { 
   var type = Type(variable),
-      value = Evaluate(type, variable);
+      value = Evaluate(type, variable),
+      id = variable['syc-object-id'];
 
-  if (type === 'object' || type === 'array') { 
-    id = variable['syc-object-id'];
-
+  if (Recurrable(type)) { 
     if (id === undefined) 
       id = Meta(variable);
     
@@ -117,12 +122,12 @@ function Describe (variable) {
 }
 
 function Describe_Untracked (variable) { 
+  console.log('lar');
   var type = Type(variable),
-      value = Evaluate(type, variable);
+      value = Evaluate(type, variable),
+      id = variable['syc-object-id'];
 
-  if (type === 'object' || type === 'array') { 
-    id = variable['syc-object-id'];
-
+  if (Recurrable(type)) { 
     if (id === undefined) { 
       id = Meta(variable);
 
@@ -143,19 +148,19 @@ function Describe_Untracked (variable) {
 
 function Describe_Recursive (variable, visited) { 
   var type = Type(variable),
-      value = Evaluate(type, variable);
+      value = Evaluate(type, variable),
+      id = variable['syc-object-id'];
 
-  if (type === 'object' || type === 'array') { 
-    id = variable['syc-object-id'];
+  if (Recurrable(type)) { 
+
+    if (id === undefined) 
+      id = Meta(variable);
 
     if (visited === undefined) var visited = [];
     if (visited.indexOf(id) !== -1) 
       return;
     visited.push(id);
 
-    if (id === undefined) 
-      id = Meta(variable);
-    
     var properties = {};
 
     for (property in variable) {
@@ -166,7 +171,6 @@ function Describe_Recursive (variable, visited) {
   } else { 
     return {type: type, value: value};
   }
-
 }
 
 
@@ -184,7 +188,7 @@ function Receive_Object (data, socket) {
   observe_lock[id] = true;
 
   if (type === 'add' || type === 'update') { 
-    variable[property] = Resolve(changes);
+    variable[property] = Apply_Changes(changes);
   } else if (type === 'delete') { 
     delete variable[property];
   } else { 
@@ -194,14 +198,14 @@ function Receive_Object (data, socket) {
   Broadcast('syc-object-change', data, socket);;
 }
 
-function Resolve (changes) { 
+function Apply_Changes (changes) { 
   var type = changes.type,
       variable,
       properties,
       value,
       id; 
    
-  if (type === 'object' || type === 'array') { 
+  if (Recurrable(type)) { 
     properties = changes.properties,
     id         = changes.id;
 
@@ -212,7 +216,7 @@ function Resolve (changes) {
       if (type === 'array') variable = [];
       
       for (property in properties) {
-        variable[property] = Resolve(properties[property])
+        variable[property] = Apply_Changes(properties[property])
       }
 
       id = Meta(variable, id);
@@ -258,13 +262,17 @@ function Evaluate (type, value) {
   if (type === 'date')     return JSON.parse(value);
   if (type === 'regexp')   return new RegExp(value);
 
-  if (type === 'object' || type === 'array') {
+  if (Recurrable(type)) {
     return Syc.objects[value];
   }
 
   if (type === 'undefined') return undefined;
 
   throw 'Object type ' + type + ' not supported by syc';
+}
+
+function Recurrable (type) {
+  return (type === 'array' || type === 'object');
 }
 
 

@@ -9,7 +9,7 @@ Syc = {
     socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
     Reset(socket);
     
-    //if (!mapping_timer) mapping_timer = setInterval(Map, 3001);
+    if (!mapping_timer) mapping_timer = setInterval(Map, 3001);
   },
   
   sync: function (name) {
@@ -72,7 +72,7 @@ function Name (name, variable) {
   id = Meta(variable);
   Syc.variables[name] = id;
 
-  var description= Describe_Recursive(variable);
+  var description = Describe_Recursive(variable);
 
   Emit('syc-variable-new', {name: name, id: id, description: description});
 }
@@ -92,13 +92,14 @@ function Observed (changes) {
 
     var changes = Describe_Untracked(changed);
 
-    Object_Mapping[id] = changes;
+    Object_Mapping[id] = Describe_Properties(object);
 
     Emit('syc-object-change', { id: id, change_type: change_type, property: property, changes: changes });
   }
 }
 
 function Standardize_Change_Type (type) { 
+  // V8 engine has 'new', 'update', and 'delete, whereas canary users 'add, update
   if (type === 'updated') return 'update';
   if (type === 'new') return 'add';
 
@@ -106,6 +107,14 @@ function Standardize_Change_Type (type) {
 }
 
 /* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
+function Describe_Properties (variable) { 
+  properties = {};
+  for (property in variable) { 
+    properties[property] = Describe(variable[property]);
+  }
+  return properties;
+}
+
 function Describe (variable) { 
   var type = Type(variable),
       value = Evaluate(type, variable),
@@ -122,7 +131,6 @@ function Describe (variable) {
 }
 
 function Describe_Untracked (variable) { 
-  console.log('lar');
   var type = Type(variable),
       value = Evaluate(type, variable),
       id = variable['syc-object-id'];
@@ -238,7 +246,8 @@ function Meta (variable, id) {
   Syc.objects[id] = variable;
   if (Object.observe) Object.observe(variable, Observed);
   
-  Object_Mapping[id] = Describe(variable);
+  Object_Mapping[id] = Describe_Properties(variable);
+  console.log(Object_Mapping[id]);
 
   function token () { 
     // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
@@ -310,10 +319,10 @@ function Map () {
   var Visited = {},
       Marked = Syc.objects;
       
-
   for (name in Syc.variables) { 
     Traverse(Syc.objects[Syc.variables[name]]);
   }
+
 
 /*
   // Garbage Collect
@@ -325,13 +334,17 @@ function Map () {
   function Traverse (object, variable) { 
     var id = object['syc-object-id'];
 
+    console.log('bob');
     if (!(id in Object_Ownership) || Object_Ownership[id].indexOf(variable) === -1) {  // Prevent cycling
       Check_Changes(object, variable);
     }
+    console.log('fob');
 
+    /*
     // Object to Variables
     if (Object_Ownership[id] === undefined) Object_Ownership[id] = [];
     Object_Ownership[id].push(variable);
+    */
 
     return id;
   }
@@ -339,19 +352,19 @@ function Map () {
   function Check_Changes (object, variable) { 
     var id = object['syc-object-id'];
 
+    console.log(Object_Mapping[id]);
     var map = JSON.parse( JSON.stringify(Object_Mapping[id]) ); // Clone this object
 
     for (property in object) { 
       var current = Describe(object[property]);
-      console.log(current);
 
       if (property in map) { 
         var previous = map[property];
         delete map[property];
 
         if ((current.type !== previous.type) || 
-           ((current.type === 'object' || current.type === 'array') && (current.id !== old.id)) ||
-           (current.value != previous.value)) 
+           ((Recurrable(current.type)) && (current.id !== previous.id)) ||
+           (current.value !== previous.value)) 
         {
           Observation(property, 'update', object, previous);
         }
@@ -361,7 +374,7 @@ function Map () {
        
       Object_Mapping[id][property] = current;
 
-      if (current.type === 'object' || current.type === 'array') { 
+      if (Recurrable(current.type)) { 
         if (object[property]['syc-object-id'] !== undefined) { 
           Traverse(object[property], variable)
         } else { 
@@ -372,7 +385,7 @@ function Map () {
     }
 
     for (property in map) { 
-      Observation(property, 'delete', object, map[property]);
+      Observation(property, 'delete', object, Syc.objects[id]);
       
       delete Object_Mapping[id][property];
     }

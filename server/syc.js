@@ -92,7 +92,7 @@ function Observed (changes) {
 
     var changes = Describe_Untracked(changed);
 
-    Object_Mapping[id] = Describe_Properties(object);
+//    Object_Mapping[id] = Describe_Properties(object);
 
     Emit('syc-object-change', { id: id, change_type: change_type, property: property, changes: changes });
   }
@@ -247,7 +247,6 @@ function Meta (variable, id) {
   if (Object.observe) Object.observe(variable, Observed);
   
   Object_Mapping[id] = Describe_Properties(variable);
-  console.log(Object_Mapping[id]);
 
   function token () { 
     // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
@@ -334,11 +333,9 @@ function Map () {
   function Traverse (object, variable) { 
     var id = object['syc-object-id'];
 
-    console.log('bob');
     if (!(id in Object_Ownership) || Object_Ownership[id].indexOf(variable) === -1) {  // Prevent cycling
       Check_Changes(object, variable);
     }
-    console.log('fob');
 
     /*
     // Object to Variables
@@ -352,13 +349,16 @@ function Map () {
   function Check_Changes (object, variable) { 
     var id = object['syc-object-id'];
 
-    console.log(Object_Mapping[id]);
     var map = JSON.parse( JSON.stringify(Object_Mapping[id]) ); // Clone this object
+    console.log('-0- ', object);
+    console.log('=H= ', map);
 
     for (property in object) { 
       var current = Describe(object[property]);
 
+      console.log('88888', property);
       if (property in map) { 
+        console.log('oo==oo', property);
         var previous = map[property];
         delete map[property];
 
@@ -384,6 +384,7 @@ function Map () {
       }
     }
 
+    console.log(map);
     for (property in map) { 
       Observation(property, 'delete', object, Syc.objects[id]);
       

@@ -247,6 +247,7 @@ function Meta (variable, id) {
   if (Object.observe) Object.observe(variable, Observed);
   
   Object_Mapping[id] = Describe_Properties(variable);
+  console.log('zzz', Object_Mapping[id]);
 
   function token () { 
     // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
@@ -372,7 +373,7 @@ function Map () {
         Observation(property, 'add', object);
       }
        
-      Object_Mapping[id][property] = current;
+      //Object_Mapping[id][property] = current;
 
       if (Recurrable(current.type)) { 
         if (object[property]['syc-object-id'] !== undefined) { 
@@ -384,7 +385,8 @@ function Map () {
       }
     }
 
-    console.log(map);
+    console.log(Object_Mapping[id]);
+    console.log('fag', map);
     for (property in map) { 
       Observation(property, 'delete', object, Syc.objects[id]);
       

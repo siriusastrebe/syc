@@ -9,7 +9,7 @@ Syc = {
     socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
     Reset(socket);
     
-    if (!mapping_timer) mapping_timer = setInterval(Map, 3001);
+    if (!mapping_timer) mapping_timer = setInterval(Map, 6001);
   },
   
   sync: function (name) {
@@ -69,6 +69,7 @@ function Name (name, variable) {
   if (name in Syc.variables) throw DuplicateNameError(name);
 
   Object.defineProperty(variable, 'syc-variable-name', {value: name, enumerable: false});
+  console.log('.......', '\n');
   id = Meta(variable);
   Syc.variables[name] = id;
 
@@ -86,20 +87,30 @@ function Observed (changes) {
         change_type = Standardize_Change_Type(changes[change].type),
         id = object['syc-object-id'];
 
+    var changes;
+
     if (id in observe_lock) {
       delete observe_lock[id]; return
     }
 
-    var changes = Describe_Untracked(changed);
+    Update_Map(id, property, change_type, changed);
 
-//    Object_Mapping[id] = Describe_Properties(object);
+    changes = Describe_Untracked(changed);
 
     Emit('syc-object-change', { id: id, change_type: change_type, property: property, changes: changes });
   }
 }
 
+function Update_Map (id, property, type, changed) {
+  if (type === 'delete') { 
+    delete Object_Mapping[id][property];
+  } else {
+    Object_Mapping[id][property] = Describe(changed);
+  }
+}
+
 function Standardize_Change_Type (type) { 
-  // V8 engine has 'new', 'update', and 'delete, whereas canary users 'add, update
+  // V8 engine has 'new', 'update', and 'delete, whereas canary uses 'add', 'update'
   if (type === 'updated') return 'update';
   if (type === 'new') return 'add';
 
@@ -121,8 +132,10 @@ function Describe (variable) {
       id = variable['syc-object-id'];
 
   if (Recurrable(type)) { 
-    if (id === undefined) 
+    if (id === undefined) { 
+      console.log('nhyeh nyhe', '\n');
       id = Meta(variable);
+    }
     
     return {type: type, id: id};
   } else { 
@@ -137,6 +150,7 @@ function Describe_Untracked (variable) {
 
   if (Recurrable(type)) { 
     if (id === undefined) { 
+      console.log('Hue hue hue', '\n');
       id = Meta(variable);
 
       var properties = {};
@@ -161,8 +175,10 @@ function Describe_Recursive (variable, visited) {
 
   if (Recurrable(type)) { 
 
-    if (id === undefined) 
+    if (id === undefined) {
+      console.log('GRRRRR', '\n');
       id = Meta(variable);
+    }
 
     if (visited === undefined) var visited = [];
     if (visited.indexOf(id) !== -1) 
@@ -227,6 +243,7 @@ function Apply_Changes (changes) {
         variable[property] = Apply_Changes(properties[property])
       }
 
+      console.log('roar', '\n');
       id = Meta(variable, id);
 
       return variable;
@@ -240,15 +257,21 @@ function Apply_Changes (changes) {
 
 // ---- ---- ---- ----  Object Conversion  ----- ---- ---- ---- 
 function Meta (variable, id) {
+  if (variable['syc-object-id']) { throw "Already Existing object" };
+
   var id = id || token();
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
 
   Syc.objects[id] = variable;
+
+  var properties =  Describe_Properties(variable);
+  Object_Mapping[id] = properties;
+  var stack = new Error().stack;
+  console.log(stack);
+  console.log('WHOA, METAA', id, properties, '\n\n');
+
   if (Object.observe) Object.observe(variable, Observed);
   
-  Object_Mapping[id] = Describe_Properties(variable);
-  console.log('zzz', Object_Mapping[id]);
-
   function token () { 
     // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
     function rand () { return Math.random().toString(36).substr(2) }
@@ -351,15 +374,11 @@ function Map () {
     var id = object['syc-object-id'];
 
     var map = JSON.parse( JSON.stringify(Object_Mapping[id]) ); // Clone this object
-    console.log('-0- ', object);
-    console.log('=H= ', map);
 
     for (property in object) { 
       var current = Describe(object[property]);
 
-      console.log('88888', property);
       if (property in map) { 
-        console.log('oo==oo', property);
         var previous = map[property];
         delete map[property];
 
@@ -372,8 +391,6 @@ function Map () {
       } else { 
         Observation(property, 'add', object);
       }
-       
-      //Object_Mapping[id][property] = current;
 
       if (Recurrable(current.type)) { 
         if (object[property]['syc-object-id'] !== undefined) { 
@@ -385,17 +402,14 @@ function Map () {
       }
     }
 
-    console.log(Object_Mapping[id]);
-    console.log('fag', map);
     for (property in map) { 
       Observation(property, 'delete', object, Syc.objects[id]);
-      
-      delete Object_Mapping[id][property];
     }
   }
 
   function Observation (name, type, object, oldValue) { 
     Observed([{name: name, type: type, object: object, oldValue: oldValue}]);
+
   }
 }
 

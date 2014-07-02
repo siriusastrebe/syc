@@ -69,7 +69,6 @@ function Name (name, variable) {
   if (name in Syc.variables) throw DuplicateNameError(name);
 
   Object.defineProperty(variable, 'syc-variable-name', {value: name, enumerable: false});
-  console.log('.......', '\n');
   id = Meta(variable);
   Syc.variables[name] = id;
 
@@ -93,7 +92,7 @@ function Observed (changes) {
       delete observe_lock[id]; return
     }
 
-    Update_Map(id, property, change_type, changed);
+//    Update_Map(id, property, change_type, changed);
 
     changes = Describe_Untracked(changed);
 
@@ -133,7 +132,6 @@ function Describe (variable) {
 
   if (Recurrable(type)) { 
     if (id === undefined) { 
-      console.log('nhyeh nyhe', '\n');
       id = Meta(variable);
     }
     
@@ -150,8 +148,6 @@ function Describe_Untracked (variable) {
 
   if (Recurrable(type)) { 
     if (id === undefined) { 
-      console.log('Hue hue hue', '\n');
-      id = Meta(variable);
 
       var properties = {};
 
@@ -174,9 +170,7 @@ function Describe_Recursive (variable, visited) {
       id = variable['syc-object-id'];
 
   if (Recurrable(type)) { 
-
     if (id === undefined) {
-      console.log('GRRRRR', '\n');
       id = Meta(variable);
     }
 
@@ -243,7 +237,6 @@ function Apply_Changes (changes) {
         variable[property] = Apply_Changes(properties[property])
       }
 
-      console.log('roar', '\n');
       id = Meta(variable, id);
 
       return variable;
@@ -264,11 +257,16 @@ function Meta (variable, id) {
 
   Syc.objects[id] = variable;
 
-  var properties =  Describe_Properties(variable);
-  Object_Mapping[id] = properties;
-  var stack = new Error().stack;
-  console.log(stack);
-  console.log('WHOA, METAA', id, properties, '\n\n');
+    var properties =  Describe_Properties(variable);
+    Object_Mapping[id] = properties;
+
+    var stack = new Error().stack;
+    console.log(stack);
+
+    console.log(Syc.variables);
+    console.log(id, Object_Mapping[id]);
+    console.log('\n');
+
 
   if (Object.observe) Object.observe(variable, Observed);
   

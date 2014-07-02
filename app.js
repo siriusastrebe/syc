@@ -48,7 +48,7 @@ var i = 0;
 //setTimeout(function () {
 //setInterval(function () { v[i] = i; i++ }, 7000);
 //v[i++] = [1, 2, 5, 7, 8];
-v[i++] = [[1, 2,], [3, 4], [5,6]];
+v[i++] = [[1, 2,], [3, 4]];
 /*
 v[i++] = {};
 

@@ -170,7 +170,6 @@ var Syc = {
     return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
   },
 
-
   // --- --- ------ ----  Helper Functions  ---- ---- ---- ----
   Meta: function (variable, id) {
     var id = id || token();
@@ -188,6 +187,63 @@ var Syc = {
     }
 
     return id;
+  },
+
+  
+  Traverse: function () { 
+    for (id in Syc.variables) { 
+      Syc.Map(Syc.variables[id]);
+    }
+  },
+
+  Map: function (variable) {
+    Syc.Per_Variable(variable);
+
+    for (property in variable) {
+      var recur = Per_Property(variable, variable[property]);
+
+      if (recur) { 
+        Syc.Map(variable[property]);
+      }
+    }
+  },
+
+  Per_Variable: function (variable) { 
+
+  },
+
+  Per_Property: function (variable, property) { 
+    var type = Syc.Type(property),
+        value,
+        id,
+        clone;
+
+    if (clone === undefined) // Addition
+      
+    if (type === 'array' || type === 'object') { 
+      id = property['syc-object-id'];
+
+      // So this is a little complex, so let me explain.
+      // We traverse over each variable through its structure, comparing our copy with its current value.
+      // but we don't traverse its contents if its undefined (untracked). Instead, we simply call Observe
+      // on any undefined properties, which will handle it with Describe and eventually Meta.
+      // 
+      // As a result, Map only has the power to call Observed, without otherwise manipulating variables
+      // in any way that Observed already handles. Much like a proper poly-fill.
+
+
+      if (id === undefined) {
+        // update
+      } else if (clone.id !== id) { 
+        // update
+      } 
+    } else {  
+      if (clone.type !== type) { 
+        // update
+      } else if (clone.value !== value) { 
+        // update
+      }
+    }
   },
 }
 

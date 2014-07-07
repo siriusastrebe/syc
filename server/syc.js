@@ -9,7 +9,7 @@ Syc = {
     socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
     Reset(socket);
     
-    if (!mapping_timer) mapping_timer = setInterval(Map, 6001);
+//    if (!mapping_timer) mapping_timer = setInterval(Map, 6001);
   },
   
   sync: function (name) {
@@ -211,9 +211,9 @@ function Receive_Object (data, socket) {
     delete variable[property];
   } else { 
     throw 'Recieved changes for an unknown change type: ' + type;
-  } 
+  }
 
-  Broadcast('syc-object-change', data, socket);;
+  Broadcast('syc-object-change', data, socket);
 }
 
 function Apply_Changes (changes) { 
@@ -257,16 +257,8 @@ function Meta (variable, id) {
 
   Syc.objects[id] = variable;
 
-    var properties =  Describe_Properties(variable);
-    Object_Mapping[id] = properties;
-
-    var stack = new Error().stack;
-    console.log(stack);
-
-    console.log(Syc.variables);
-    console.log(id, Object_Mapping[id]);
-    console.log('\n');
-
+  var properties =  Describe_Properties(variable);
+  Object_Mapping[id] = properties;
 
   if (Object.observe) Object.observe(variable, Observed);
   

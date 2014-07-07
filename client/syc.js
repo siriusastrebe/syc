@@ -4,6 +4,8 @@ var Syc = {
 
     socket.on('syc-object-change', Syc.Receive_Object);
     socket.on('syc-variable-new', Syc.New_Variable);
+
+    if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, 6000);
   },
 
   list: function (name) {
@@ -31,11 +33,11 @@ var Syc = {
 
   List: function (argument) { return Syc.list(argument) },
 
-
   variables: {},
   objects: {},
 
   observe_lock: {},
+  object_map: {},
 
   /* ---- ---- ---- ----  New Variables  ---- ---- ---- ---- */
   New_Variable: function (data) { 
@@ -43,7 +45,6 @@ var Syc = {
         id = data.id,
         description = data.description;
 
-    console.log(data);
     Syc.variables[name] = id;
 
     var variable = Syc.Resolve(description);
@@ -90,11 +91,13 @@ var Syc = {
         if (type === 'object') variable = {};
         if (type === 'array') variable = [];
 
+        id = Syc.Meta(variable, id);
+
         for (property in properties) {
           variable[property] = Syc.Resolve(properties[property])
         }
-
-        id = Syc.Meta(variable, id);
+     
+        Syc.Map_Object(variable);
 
         return variable;
       }
@@ -112,7 +115,7 @@ var Syc = {
     if (type === 'regexp')   return new RegExp(value);
 
     if (type === 'object' || type === 'array') {
-      return Syc.objects[value];
+      return value['syc-object-id'];
     }
 
     if (type === 'undefined') return undefined;
@@ -151,11 +154,13 @@ var Syc = {
       if (id === undefined) { 
         var properties = {};
 
+        id = Syc.Meta(variable);
+
         for (property in variable) {
           properties[property] = Syc.Describe(variable[property]);
         }
 
-        id = Syc.Meta(variable);
+        Syc.Map_Object(variable);
 
         return {type: type, id: id, properties: properties};
       } else { 
@@ -178,6 +183,8 @@ var Syc = {
     Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
     if (Object.observe) Object.observe(variable, Syc.Observed);
 
+    Syc.object_map[id] = {};
+
     function token () { 
       // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
       function rand () { return Math.random().toString(36).substr(2) }
@@ -190,61 +197,85 @@ var Syc = {
   },
 
   
+  // ---- ---- ---- ----  Polyfill ---- ---- ---- ---- 
+  Map_Object: function (variable) { 
+    var id = variable['syc-object-id'];
+
+    for (property in variable) { 
+      var type = Syc.Type(variable[property]),
+          value = Syc.Evaluate(type, variable[property]);
+
+      Syc.object_map[id][property] = {type: type, value: value};
+    }
+  },
+
   Traverse: function () { 
     for (id in Syc.variables) { 
-      Syc.Map(Syc.variables[id]);
+      Syc.Map(Syc.objects[Syc.variables[id]]);
     }
   },
 
   Map: function (variable) {
-    Syc.Per_Variable(variable);
+    var id = variable['syc-object-id'];
+    if (id === undefined) throw 'No id error: polyfill cannot determine object id';
+
+    Syc.Per_Variable(variable, id);
 
     for (property in variable) {
-      var recur = Per_Property(variable, variable[property]);
+      var recur = Syc.Per_Property(variable, property, id);
 
-      if (recur) { 
+      if (recur) { // Map shouldn't recur over untracked objects/arrays
         Syc.Map(variable[property]);
       }
     }
   },
 
-  Per_Variable: function (variable) { 
+  Per_Variable: function (variable, id) { 
+    var map = Syc.object_map[id];
 
-  },
-
-  Per_Property: function (variable, property) { 
-    var type = Syc.Type(property),
-        value,
-        id,
-        clone;
-
-    if (clone === undefined) // Addition
-      
-    if (type === 'array' || type === 'object') { 
-      id = property['syc-object-id'];
-
-      // So this is a little complex, so let me explain.
-      // We traverse over each variable through its structure, comparing our copy with its current value.
-      // but we don't traverse its contents if its undefined (untracked). Instead, we simply call Observe
-      // on any undefined properties, which will handle it with Describe and eventually Meta.
-      // 
-      // As a result, Map only has the power to call Observed, without otherwise manipulating variables
-      // in any way that Observed already handles. Much like a proper poly-fill.
-
-
-      if (id === undefined) {
-        // update
-      } else if (clone.id !== id) { 
-        // update
-      } 
-    } else {  
-      if (clone.type !== type) { 
-        // update
-      } else if (clone.value !== value) { 
-        // update
+    for (property in map) {
+      if (!(property in variable)) { 
+        Syc.Observer(property, variable, 'delete', map[property]);
       }
     }
   },
+
+  Per_Property: function (variable, name, id) { 
+    var property = variable[name],
+        type = Syc.Type(property),
+        value = Syc.Evaluate(type, property);
+
+    var map = Syc.object_map[id][name];
+
+    if (map === undefined) {
+      Syc.Observer(name, variable, 'add');
+    }
+
+    else if (map.type !== type) { 
+      Syc.Observer(name, variable, 'update', map)
+    }
+
+    else if (type === 'array' || type === 'object') { 
+      if (id === undefined) {
+        Syc.Observer(name, variable, 'update', map)
+      }
+
+      else if (map.id !== id) { 
+        Syc.Observer(name, variable, 'update', map)
+      }
+
+      return true;
+
+    } else if (map.value !== value) { 
+      Syc.Observer(name, variable, 'update', map)
+    }
+ 
+    return false;
+  },
+
+  Observer: function (name, object, type, old_value) { 
+    console.log(name, object, type, old_value);
+  }
 }
 
 var syc = Syc;

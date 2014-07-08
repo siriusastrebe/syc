@@ -83,7 +83,7 @@ function Observed (changes) {
     var object = changes[change].object,
         property = changes[change].name,
         changed = object[property],
-        change_type = Standardize_Change_Type(changes[change].type),
+        type = Standardize_Change_Type(changes[change].type),
         id = object['syc-object-id'];
 
     var changes;
@@ -92,11 +92,9 @@ function Observed (changes) {
       delete observe_lock[id]; return
     }
 
-//    Update_Map(id, property, change_type, changed);
-
     changes = Describe_Untracked(changed);
 
-    Emit('syc-object-change', { id: id, change_type: change_type, property: property, changes: changes });
+    Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
 }
 
@@ -193,6 +191,7 @@ function Describe_Recursive (variable, visited) {
 
 
 function Receive_Object (data, socket) { 
+  console.log(data);
   var type     = data.type,
       id       = data.id,
       property = data.property

@@ -21,16 +21,6 @@ var Syc = {
     }
   },
 
-/*
-  watchers: {},
-
-  watch: function (name, watcher) { 
-    if (Syc.watchers[name] === undefined) Syc.watchers = [];
-
-    Syc.watchers[name].push(watcher) {
-  },
-*/
-
   List: function (argument) { return Syc.list(argument) },
 
   variables: {},
@@ -53,7 +43,7 @@ var Syc = {
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
 
   Receive_Object: function (data) { 
-    var change_type = data.change_type,
+    var type        = data.type,
         id          = data.id,
         property    = data.property
         changes     = data.changes;
@@ -65,12 +55,12 @@ var Syc = {
 
     Syc.observe_lock[id] = true;
 
-    if (change_type === 'add' || change_type === 'update') { 
+    if (type === 'add' || type === 'update') { 
       variable[property] = Syc.Resolve(changes)
-    } else if (change_type === 'delete') { 
+    } else if (type === 'delete') { 
       delete variable[property];
     } else { 
-      throw 'Received changes for an unknown change type: ' + change_type;
+      throw 'Received changes for an unknown change type: ' + type;
     }
   },
 
@@ -132,13 +122,11 @@ var Syc = {
           type = changes[change].type,
           id = object['syc-object-id'];
 
-      if (id in Syc.observe_lock) {
-        delete Syc.observe_lock[id];
-        return ;
-      }
+      if (id in Syc.observe_lock) { delete Syc.observe_lock[id]; return }
 
       var changes = Syc.Describe(changed);
 
+      console.log(changes);
       Syc.Socket.emit('syc-object-change', { id: id, type: type,  property: property, changes: changes });
     }
   },
@@ -183,8 +171,6 @@ var Syc = {
     Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
     if (Object.observe) Object.observe(variable, Syc.Observed);
 
-    Syc.object_map[id] = {};
-
     function token () { 
       // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
       function rand () { return Math.random().toString(36).substr(2) }
@@ -198,8 +184,14 @@ var Syc = {
 
   
   // ---- ---- ---- ----  Polyfill ---- ---- ---- ---- 
+  // Map_Object should come after a call to Meta for the variable in question, and
+  // after a recursive describe/resolve (so as to ensure Map_Object's properties all
+  // have syc-object-id.
+
   Map_Object: function (variable) { 
     var id = variable['syc-object-id'];
+
+    Syc.object_map[id] = []; // Reset the mapping
 
     for (property in variable) { 
       var type = Syc.Type(variable[property]),
@@ -228,6 +220,8 @@ var Syc = {
         Syc.Map(variable[property]);
       }
     }
+
+    Syc.Map_Object(variable);
   },
 
   Per_Variable: function (variable, id) { 
@@ -240,41 +234,55 @@ var Syc = {
     }
   },
 
-  Per_Property: function (variable, name, id) { 
+  Per_Property: function (variable, name, variable_id) { 
     var property = variable[name],
         type = Syc.Type(property),
         value = Syc.Evaluate(type, property);
 
-    var map = Syc.object_map[id][name];
+    var map = Syc.object_map[variable_id][name];
 
     if (map === undefined) {
       Syc.Observer(name, variable, 'add');
     }
 
     else if (map.type !== type) { 
-      Syc.Observer(name, variable, 'update', map)
+      Syc.Observer(name, variable, 'update', map);
     }
 
     else if (type === 'array' || type === 'object') { 
-      if (id === undefined) {
-        Syc.Observer(name, variable, 'update', map)
+      var property_id = property['syc-object-id'];
+
+      if (property_id === undefined) {
+        Syc.Observer(name, variable, 'update ', map);
       }
 
-      else if (map.id !== id) { 
-        Syc.Observer(name, variable, 'update', map)
+      else if (map.value !== property_id) { 
+        Syc.Observer(name, variable, 'update', map);
       }
 
       return true;
 
     } else if (map.value !== value) { 
-      Syc.Observer(name, variable, 'update', map)
+      Syc.Observer(name, variable, 'update', map.value);
     }
  
     return false;
   },
 
   Observer: function (name, object, type, old_value) { 
-    console.log(name, object, type, old_value);
+    var changes = {name: name, object: object, type: type};
+
+    if (old_value) { 
+      if (old_value.type === 'array' || old_value.type === 'object') { 
+        if (old_value.value in Syc.objects) { 
+          changes.old_value = Syc.objects[old_value.value];
+        }
+      } else {
+        changes.old_value = old_value;
+      }
+    }
+
+    Syc.Observed([changes]);
   }
 }
 

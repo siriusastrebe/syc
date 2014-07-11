@@ -1,6 +1,5 @@
 var connected = [];
 var observe_lock = {};
-var Object_Mapping = {};
 var mapping_timer;
 
 Syc = {
@@ -93,17 +92,9 @@ function Observed (changes) {
       delete observe_lock[id]; return
     }
 
-    changes = Describe_Untracked(changed);
+    changes = Describe(changed);
 
     Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
-  }
-}
-
-function Update_Map (id, property, type, changed) {
-  if (type === 'delete') { 
-    delete Object_Mapping[id][property];
-  } else {
-    Object_Mapping[id][property] = Describe(changed);
   }
 }
 
@@ -116,39 +107,17 @@ function Standardize_Change_Type (type) {
 }
 
 /* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
-function Describe_Properties (variable) { 
-  properties = {};
-  for (property in variable) { 
-    properties[property] = Describe(variable[property]);
-  }
-  return properties;
-}
-
 function Describe (variable) { 
   var type = Type(variable),
-      value = Evaluate(type, variable),
-      id = variable['syc-object-id'];
+      value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
+    var id = variable['syc-object-id'];
+
     if (id === undefined) { 
-      id = Meta(variable);
-    }
-    
-    return {type: type, id: id};
-  } else { 
-    return {type: type, value: value};
-  }
-}
-
-function Describe_Untracked (variable) { 
-  var type = Type(variable),
-      value = Evaluate(type, variable),
-      id = variable['syc-object-id'];
-
-  if (Recurrable(type)) { 
-    if (id === undefined) { 
-
       var properties = {};
+
+      id = Meta(variable);
 
       for (property in variable) {
         properties[property] = Describe_Untracked(variable[property]);
@@ -163,19 +132,20 @@ function Describe_Untracked (variable) {
   }
 }
 
+// This is slated to be replaced entirely by the Object Mapping polyfil container. 
 function Describe_Recursive (variable, visited) { 
   var type = Type(variable),
-      value = Evaluate(type, variable),
-      id = variable['syc-object-id'];
+      value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
+    var id = variable['syc-object-id'];
+
     if (id === undefined) {
       id = Meta(variable);
     }
 
     if (visited === undefined) var visited = [];
-    if (visited.indexOf(id) !== -1) 
-      return;
+    if (visited.indexOf(id) !== -1) return {type: type, id: id};
     visited.push(id);
 
     var properties = {};
@@ -216,7 +186,6 @@ function Receive_Object (data, socket) {
 }
 
 function Apply_Changes (changes) { 
-  console.log(JSON.stringify(changes));
   var type = changes.type,
       variable,
       properties,
@@ -256,9 +225,6 @@ function Meta (variable, id) {
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
 
   Syc.objects[id] = variable;
-
-  var properties =  Describe_Properties(variable);
-  Object_Mapping[id] = properties;
 
   if (Object.observe) Object.observe(variable, Observed);
   
@@ -308,98 +274,6 @@ function Reset (socket) {
         variable = Syc.objects[id];
 
     Emit('syc-variable-new', {name: name, id: id, description: Describe_Recursive(variable)}, [socket]);
-  }
-}
-
-
-// ---- ---- ---- ----  Traversals  ---- ---- ---- ----
-
-/*
-  Garbage Collection (mark, sweep)
-  Polyfill
-  Verifier
-*/
-var Object_Ownership = {};
-
-function Map () { 
-  /* Traversal has four purposes
-  * 1) Act as a polyfill for Object.observe
-  * 2) Create a mapping of Object to Variables for use in Watchers
-  * 3) Garbage collection of unreferenced objects
-  * 4) 
-  * As such, it's this is a real friggin big function, so I've tried to abstract out each piece as much as I can.
-  */
-  var Visited = {},
-      Marked = Syc.objects;
-      
-  for (name in Syc.variables) { 
-    Traverse(Syc.objects[Syc.variables[name]]);
-  }
-
-
-/*
-  // Garbage Collect
-  for (unvisited in Marked) {
-    delete Syc.objects[unvisited];
-  }
-*/
-
-  function Traverse (object, variable) { 
-    var id = object['syc-object-id'];
-
-    if (!(id in Object_Ownership) || Object_Ownership[id].indexOf(variable) === -1) {  // Prevent cycling
-      Check_Changes(object, variable);
-    }
-
-    /*
-    // Object to Variables
-    if (Object_Ownership[id] === undefined) Object_Ownership[id] = [];
-    Object_Ownership[id].push(variable);
-    */
-
-    return id;
-  }
-
-  function Check_Changes (object, variable) { 
-    var id = object['syc-object-id'];
-
-    var map = JSON.parse( JSON.stringify(Object_Mapping[id]) ); // Clone this object
-
-    for (property in object) { 
-      var current = Describe(object[property]);
-
-      if (property in map) { 
-        var previous = map[property];
-        delete map[property];
-
-        if ((current.type !== previous.type) || 
-           ((Recurrable(current.type)) && (current.id !== previous.id)) ||
-           (current.value !== previous.value)) 
-        {
-          Observation(property, 'update', object, previous);
-        }
-      } else { 
-        Observation(property, 'add', object);
-      }
-
-      if (Recurrable(current.type)) { 
-        if (object[property]['syc-object-id'] !== undefined) { 
-          Traverse(object[property], variable)
-        } else { 
-          Observation(property, 'add', object);
-          Traverse(object[property], variable);
-        }
-      }
-    }
-
-    for (property in map) { 
-      Observation(property, 'delete', object, Syc.objects[id]);
-    }
-  }
-
-  function Observation (name, type, object, oldValue) { 
-    Observed([{name: name, type: type, object: object, oldValue: oldValue}]);
-
   }
 }
 

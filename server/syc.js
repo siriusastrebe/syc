@@ -1,5 +1,6 @@
 var connected = [];
 var observe_lock = {};
+var object_map = {};
 var mapping_timer;
 
 Syc = {
@@ -8,7 +9,7 @@ Syc = {
     socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
     Reset(socket);
     
-//    if (!mapping_timer) mapping_timer = setInterval(Map, 6001);
+    if (!mapping_timer) mapping_timer = setInterval(Traverse, 6001);
   },
   
   sync: function (name) {
@@ -74,6 +75,8 @@ function Name (name, variable) {
 
   var description = Describe_Recursive(variable);
 
+  Map_Object(variable);
+
   Emit('syc-variable-new', {name: name, id: id, description: description});
 }
 
@@ -123,6 +126,8 @@ function Describe (variable) {
         properties[property] = Describe_Untracked(variable[property]);
       }
 
+      Map_Object(variable);
+
       return {type: type, id: id, properties: properties};
     } else { 
       return {type: type, id: id};
@@ -132,7 +137,7 @@ function Describe (variable) {
   }
 }
 
-// This is slated to be replaced entirely by the Object Mapping polyfil container. 
+// TODO: This is slated to be replaced entirely by the Object Mapping polyfil container. 
 function Describe_Recursive (variable, visited) { 
   var type = Type(variable),
       value = Evaluate(type, variable);
@@ -153,6 +158,8 @@ function Describe_Recursive (variable, visited) {
     for (property in variable) {
       properties[property] = Describe_Recursive(variable[property], visited);
     }
+
+    Map_Object(variable);
 
     return {type: type, id: id, properties: properties};
   } else { 
@@ -201,12 +208,14 @@ function Apply_Changes (changes) {
     } else { 
       if (type === 'object') variable = {};
       if (type === 'array') variable = [];
+
+      id = Meta(variable, id);
       
       for (property in properties) {
         variable[property] = Apply_Changes(properties[property])
       }
 
-      id = Meta(variable, id);
+      Map_Object(variable);
 
       return variable;
     }
@@ -276,6 +285,137 @@ function Reset (socket) {
     Emit('syc-variable-new', {name: name, id: id, description: Describe_Recursive(variable)}, [socket]);
   }
 }
+
+
+// ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
+// ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 
+// Map_Object should come after a call to Meta for the variable in question, and
+// after a recursive describe/resolve (so as to ensure Map_Object's properties all
+// have syc-object-id).
+Map_Object = function (variable) { 
+  var id = variable['syc-object-id'];
+
+  object_map[id] = []; // Reset the mapping
+
+  for (property in variable) { 
+    var type = Type(variable[property]),
+        value = Evaluate(type, variable[property]);
+
+    object_map[id][property] = {type: type, value: value};
+  }
+}
+
+var visited = {};
+
+function Traverse () { 
+  for (obj in Syc.objects) { 
+    visited[obj] = false;
+  }
+
+  // Start the recursion
+  for (id in Syc.variables) { 
+    Map(Syc.objects[Syc.variables[id]]);
+  }
+
+  // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
+  for (obj in visited) { 
+    if (!(visited[obj])) { 
+      delete Syc.objects[obj];
+    }
+  }
+}
+
+function Map (variable) {
+  var id = variable['syc-object-id'];
+
+  if (id === undefined) throw 'Sanity Check: polyfill cannot determine object id';
+
+  var proceed = Per_Variable(variable, id);
+
+  if (proceed) { 
+    for (property in variable) {
+      var recur = Per_Property(variable, property, id);
+
+      if (recur) { 
+        Map(variable[property]);
+      }
+    }
+  }
+
+  Map_Object(variable);
+}
+
+function Per_Variable (variable, id) { 
+  if (id in visited) { 
+    if (visited[id]) return false;
+    else visited[id] = true;
+  } else {
+    throw "Sanity check: id " + id + " not given a mark for garbage collection." 
+  }
+
+  var map = object_map[id];
+
+  for (property in map) {
+    if (!(property in variable)) { 
+      Observer(property, variable, 'delete', map[property]);
+    }
+  }
+
+  return true;
+}
+
+function Per_Property (variable, name, variable_id) { 
+  var property = variable[name],
+      type = Type(property),
+      value = Evaluate(type, property);
+
+  var map = object_map[variable_id][name];
+
+  if (map === undefined) {
+    Observer(name, variable, 'add');
+  }
+
+  else if (map.type !== type) { 
+    Observer(name, variable, 'update', map);
+  }
+
+  else if (type === 'array' || type === 'object') { 
+    var property_id = property['syc-object-id'];
+
+    if (property_id === undefined) {
+      Observer(name, variable, 'update ', map);
+      return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
+    }
+
+    else if (map.value !== property_id) { 
+      Observer(name, variable, 'update', map);
+    }
+
+    return true;
+
+  } else if (map.value !== value) { 
+    Observer(name, variable, 'update', map.value);
+  }
+ 
+  return false; 
+}
+
+function Observer (name, object, type, old_value) { 
+  var changes = {name: name, object: object, type: type};
+
+  if (old_value) { 
+    if (old_value.type === 'array' || old_value.type === 'object') { 
+      if (old_value.value in Syc.objects) { 
+        changes.old_value = Syc.objects[old_value.value];
+      }
+    } else {
+      changes.old_value = old_value;
+    }
+  }
+
+  Observed([changes]);
+}
+
 
 
 

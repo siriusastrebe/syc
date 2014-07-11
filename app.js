@@ -43,26 +43,15 @@ v = new syc.sync('YO');
 
 y = new syc.sync('BRO');
 
-var i = 0;
-
 //setTimeout(function () {
 //setInterval(function () { v[i] = i; i++ }, 7000);
 //v[i++] = [1, 2, 5, 7, 8];
-v[i++] = [[1, 2,], [3, 4]];
-/*
-v[i++] = {};
-
-y['hi'] = 'hello';
-
-
-setTimeout(function () { 
-  console.log(v['syc-variable-name'], v['syc-object-id']);
-}, 3000);
+v[0] = [[1, 2,], [3, 4]];
+v[1] = {};
 
 setInterval(function () { 
-  v[2][random_word()] = random_word();
+  v[1][random_word()] = random_word();
 }, 5500);
-*/
 
 
 function random_word () { 

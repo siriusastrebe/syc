@@ -142,7 +142,6 @@ var Syc = {
         var properties = {};
 
         id = Syc.Meta(variable);
-        console.log(id);
 
         for (property in variable) {
           properties[property] = Syc.Describe(variable[property]);
@@ -218,7 +217,8 @@ var Syc = {
     // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
     for (obj in Syc.visited) { 
       if (!(Syc.visited[obj])) { 
-        delete Syc.objects[id];
+        delete Syc.objects[obj];
+        console.log('deleted ' + obj);
       }
     }
   },

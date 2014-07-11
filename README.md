@@ -3,12 +3,11 @@ Syc
 
 If you're using Javascript on both the server and client, why worry about message passing from server to client?
 
-Syc allows you to create a variable which, when modified on the server, will reflect those same changes on the client. It works under a simple principle: All data bound to the variable in question is identical between Server and Client.
+When you create a Syc variable, an identical variable will appear on the client side. Any changes to this variable will be communicated via socket.io instantaneously and will see those same changes on the client. Clients can modify the variable and have it reflected on the server side. It works under a simple principle: All data bound to the variable in question is identical between Server and Client.
 
 Like Meteor, but without the framework.
 
-** Currently, Syc uses Object.observe and requires ECMA 7 on the server and client to operate. Update Node.js to latest and run using the harmony flag: `node --harmony app.js` **
-
+Syc uses Object.observe if it's available for incredible responsiveness and performance, but will easily fall back onto a polyfill for older clients, or when you need to run Node without the --harmony flag.
 
 ## Syncing a variable (Server side)
 
@@ -52,7 +51,8 @@ Now syc will be able to sync variables with this client.
 
 
 - - - 
-This library is a work in progress. Latest feature: Client -> Server synchronization.
-Planned features: Server -> Client one way synchronization, an Object.observe shim for non ECMA-7 clients and servers, watchers, and verifiers.
+This library is a work in progress, don't mind the extra files lying around. All you need is server/syc.js and client/syc.js.
 
-Syc currently supports circular data structures.
+Planned features: Server -> Client one way synchronization, watchers, and verifiers.
+
+Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!

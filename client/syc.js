@@ -30,6 +30,7 @@ var Syc = {
   object_map: {},
 
   /* ---- ---- ---- ----  New Variables  ---- ---- ---- ---- */
+  /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
   New_Variable: function (data) { 
     var name = data.name,
         id = data.id,
@@ -40,7 +41,6 @@ var Syc = {
     var variable = Syc.Resolve(description);
   },
 
-  /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
 
   Receive_Object: function (data) { 
     var type        = data.type,
@@ -126,7 +126,6 @@ var Syc = {
 
       var changes = Syc.Describe(changed);
 
-      console.log(changes);
       Syc.Socket.emit('syc-object-change', { id: id, type: type,  property: property, changes: changes });
     }
   },
@@ -137,12 +136,13 @@ var Syc = {
         value = Syc.Evaluate(type, variable);
 
     if (type === 'object' || type === 'array') { 
-      id = variable['syc-object-id'];
+      var id = variable['syc-object-id'];
 
       if (id === undefined) { 
         var properties = {};
 
         id = Syc.Meta(variable);
+        console.log(id);
 
         for (property in variable) {
           properties[property] = Syc.Describe(variable[property]);
@@ -183,11 +183,11 @@ var Syc = {
   },
 
   
-  // ---- ---- ---- ----  Polyfill ---- ---- ---- ---- 
+  // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
+  // ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 
   // Map_Object should come after a call to Meta for the variable in question, and
   // after a recursive describe/resolve (so as to ensure Map_Object's properties all
-  // have syc-object-id.
-
+  // have syc-object-id).
   Map_Object: function (variable) { 
     var id = variable['syc-object-id'];
 
@@ -201,23 +201,42 @@ var Syc = {
     }
   },
 
+
+  visited: {},
+
   Traverse: function () { 
+    Syc.visited = {};
+    for (obj in Syc.objects) { 
+      Syc.visited[obj] = false;
+    }
+
+    // Start the recursion
     for (id in Syc.variables) { 
       Syc.Map(Syc.objects[Syc.variables[id]]);
+    }
+
+    // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
+    for (obj in Syc.visited) { 
+      if (!(Syc.visited[obj])) { 
+        delete Syc.objects[id];
+      }
     }
   },
 
   Map: function (variable) {
     var id = variable['syc-object-id'];
-    if (id === undefined) throw 'No id error: polyfill cannot determine object id';
 
-    Syc.Per_Variable(variable, id);
+    if (id === undefined) throw 'Sanity Check: polyfill cannot determine object id';
 
-    for (property in variable) {
-      var recur = Syc.Per_Property(variable, property, id);
+    var proceed = Syc.Per_Variable(variable, id);
 
-      if (recur) { // Map shouldn't recur over untracked objects/arrays
-        Syc.Map(variable[property]);
+    if (proceed) { 
+      for (property in variable) {
+        var recur = Syc.Per_Property(variable, property, id);
+
+        if (recur) { 
+          Syc.Map(variable[property]);
+        }
       }
     }
 
@@ -225,6 +244,13 @@ var Syc = {
   },
 
   Per_Variable: function (variable, id) { 
+    if (id in Syc.visited) { 
+      if (syc.visited[id]) return false;
+      else Syc.visited[id] = true;
+    } else {
+      throw "Sanity check: id " + id + " not given a mark for garbage collection." 
+    }
+
     var map = Syc.object_map[id];
 
     for (property in map) {
@@ -232,6 +258,8 @@ var Syc = {
         Syc.Observer(property, variable, 'delete', map[property]);
       }
     }
+
+    return true;
   },
 
   Per_Property: function (variable, name, variable_id) { 
@@ -254,6 +282,7 @@ var Syc = {
 
       if (property_id === undefined) {
         Syc.Observer(name, variable, 'update ', map);
+        return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
       }
 
       else if (map.value !== property_id) { 
@@ -266,7 +295,7 @@ var Syc = {
       Syc.Observer(name, variable, 'update', map.value);
     }
  
-    return false;
+    return false; 
   },
 
   Observer: function (name, object, type, old_value) { 

@@ -70,6 +70,7 @@ function Name (name, variable) {
 
   Object.defineProperty(variable, 'syc-variable-name', {value: name, enumerable: false});
   id = Meta(variable);
+
   Syc.variables[name] = id;
 
   var description = Describe_Recursive(variable);
@@ -191,7 +192,6 @@ function Describe_Recursive (variable, visited) {
 
 
 function Receive_Object (data, socket) { 
-  console.log(data);
   var type     = data.type,
       id       = data.id,
       property = data.property
@@ -216,6 +216,7 @@ function Receive_Object (data, socket) {
 }
 
 function Apply_Changes (changes) { 
+  console.log(JSON.stringify(changes));
   var type = changes.type,
       variable,
       properties,

@@ -2,11 +2,12 @@ var connected = [];
 var observe_lock = {};
 var object_map = {};
 var mapping_timer;
+var observable = !!Object.observe;
 
 Syc = {
   connect: function (socket) { 
     connected.push(socket);
-    socket.on('syc-object-change', function (data) { Receive_Object(data, socket)}) 
+    socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
     Reset(socket);
     
     if (!mapping_timer) mapping_timer = setInterval(Traverse, 6001);
@@ -91,7 +92,7 @@ function Observed (changes) {
 
     var changes;
 
-    if (id in observe_lock) {
+    if (observable && id in observe_lock) {
       delete observe_lock[id]; return
     }
 
@@ -102,7 +103,8 @@ function Observed (changes) {
 }
 
 function Standardize_Change_Type (type) { 
-  // V8 engine has 'new', 'update', and 'delete, whereas canary uses 'add', 'update'
+  // V8 engine has 'new', 'updated', and 'delete, whereas canary uses 'add', 'update'
+  // We use 'add', 'update', and 'delete' as our three operators.
   if (type === 'updated') return 'update';
   if (type === 'new') return 'add';
 
@@ -121,7 +123,7 @@ function Describe (variable) {
       value = Meta(variable);
 
       for (property in variable) {
-        properties[property] = Describe_Untracked(variable[property]);
+        properties[property] = Describe(variable[property]);
       }
 
       Map_Object(variable);
@@ -135,7 +137,6 @@ function Describe (variable) {
   }
 }
 
-// TODO: This is slated to be replaced entirely by the Object Mapping polyfil container. 
 function Describe_Recursive (variable, visited) { 
   var type = Type(variable),
       value = Evaluate(type, variable);
@@ -164,7 +165,7 @@ function Describe_Recursive (variable, visited) {
 }
 
 
-function Receive_Object (data, socket) { 
+function Receive_Change (data, socket) { 
   var type     = data.type,
       id       = data.id,
       property = data.property
@@ -175,7 +176,7 @@ function Receive_Object (data, socket) {
   if (variable === undefined)
     throw "Received changes to an unknown object: " + id;
 
-  observe_lock[id] = true;
+  if (observable) observe_lock[id] = true;
 
   if (type === 'add' || type === 'update') { 
     variable[property] = Apply_Changes(changes);
@@ -184,6 +185,8 @@ function Receive_Object (data, socket) {
   } else { 
     throw 'Recieved changes for an unknown change type: ' + type;
   }
+
+  Map_Object(variable);
 
   Broadcast('syc-object-change', data, socket);
 }

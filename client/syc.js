@@ -2,7 +2,7 @@ var Syc = {
   connect: function (socket) {
     Syc.Socket = socket;
 
-    socket.on('syc-object-change', Syc.Receive_Object);
+    socket.on('syc-object-change', Syc.Receive_Change);
     socket.on('syc-variable-new', Syc.New_Variable);
 
     if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, 6000);
@@ -29,6 +29,8 @@ var Syc = {
   observe_lock: {},
   object_map: {},
 
+  observable: !!Object.observe,
+
   /* ---- ---- ---- ----  New Variables  ---- ---- ---- ---- */
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
   New_Variable: function (data) { 
@@ -42,7 +44,7 @@ var Syc = {
   },
 
 
-  Receive_Object: function (data) { 
+  Receive_Change: function (data) { 
     var type        = data.type,
         id          = data.id,
         property    = data.property
@@ -53,7 +55,7 @@ var Syc = {
     if (variable === undefined)
       throw "Out of sync error: received changes to an unknown object: " + id;
 
-    Syc.observe_lock[id] = true;
+    if (Syc.observable) Syc.observe_lock[id] = true;
 
     if (type === 'add' || type === 'update') { 
       variable[property] = Syc.Resolve(changes)
@@ -62,6 +64,8 @@ var Syc = {
     } else { 
       throw 'Received changes for an unknown change type: ' + type;
     }
+
+    Syc.Map_Object(variable);
   },
 
   Resolve: function (changes) { 
@@ -122,7 +126,7 @@ var Syc = {
           type = changes[change].type,
           id = object['syc-object-id'];
 
-      if (id in Syc.observe_lock) { delete Syc.observe_lock[id]; return }
+      if (Syc.observable && id in Syc.observe_lock) { delete Syc.observe_lock[id]; return }
 
       var changes = Syc.Describe(changed);
 

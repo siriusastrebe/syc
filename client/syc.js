@@ -274,6 +274,7 @@ var Syc = {
     }
 
     else if (map.type !== type) { 
+      console.log('update 0', name, variable[name], map)
       Syc.Observer(name, variable, 'update', map);
     }
 
@@ -281,17 +282,20 @@ var Syc = {
       var property_id = property['syc-object-id'];
 
       if (property_id === undefined) {
+        console.log('update 1', name, variable[name], map)
         Syc.Observer(name, variable, 'update ', map);
         return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
       }
 
       else if (map.value !== property_id) { 
+        console.log('update 2', name, variable[name], map)
         Syc.Observer(name, variable, 'update', map);
       }
 
       return true;
 
     } else if (map.value !== value) { 
+      console.log('update 3', name, variable[name], map)
       Syc.Observer(name, variable, 'update', map.value);
     }
  

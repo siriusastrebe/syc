@@ -115,12 +115,10 @@ function Describe (variable) {
       value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
-    var id = variable['syc-object-id'];
-
-    if (id === undefined) { 
+    if (value === undefined) { 
       var properties = {};
 
-      id = Meta(variable);
+      value = Meta(variable);
 
       for (property in variable) {
         properties[property] = Describe_Untracked(variable[property]);
@@ -128,9 +126,9 @@ function Describe (variable) {
 
       Map_Object(variable);
 
-      return {type: type, id: id, properties: properties};
+      return {type: type, id: value, properties: properties};
     } else { 
-      return {type: type, id: id};
+      return {type: type, id: value};
     }
   } else { 
     return {type: type, value: value};
@@ -143,14 +141,12 @@ function Describe_Recursive (variable, visited) {
       value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
-    var id = variable['syc-object-id'];
-
-    if (id === undefined) {
-      id = Meta(variable);
+    if (value === undefined) {
+      value = Meta(variable);
     }
 
     if (visited === undefined) var visited = [];
-    if (visited.indexOf(id) !== -1) return {type: type, id: id};
+    if (visited.indexOf(value) !== -1) return {type: type, id: value};
     visited.push(id);
 
     var properties = {};
@@ -161,7 +157,7 @@ function Describe_Recursive (variable, visited) {
 
     Map_Object(variable);
 
-    return {type: type, id: id, properties: properties};
+    return {type: type, id: value, properties: properties};
   } else { 
     return {type: type, value: value};
   }
@@ -260,7 +256,7 @@ function Evaluate (type, value) {
   if (type === 'regexp')   return new RegExp(value);
 
   if (Recurrable(type)) {
-    return Syc.objects[value];
+    return value['syc-object-id'];
   }
 
   if (type === 'undefined') return undefined;
@@ -292,7 +288,7 @@ function Reset (socket) {
 // Map_Object should come after a call to Meta for the variable in question, and
 // after a recursive describe/resolve (so as to ensure Map_Object's properties all
 // have syc-object-id).
-Map_Object = function (variable) { 
+function Map_Object (variable) { 
   var id = variable['syc-object-id'];
 
   object_map[id] = []; // Reset the mapping
@@ -376,24 +372,27 @@ function Per_Property (variable, name, variable_id) {
   }
 
   else if (map.type !== type) { 
+      console.log('update 0', name, variable[name], map)
     Observer(name, variable, 'update', map);
   }
 
   else if (type === 'array' || type === 'object') { 
-    var property_id = property['syc-object-id'];
-
-    if (property_id === undefined) {
+    if (value === undefined) {
+        console.log('update 1', name, variable[name], map)
       Observer(name, variable, 'update ', map);
+
       return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
     }
 
-    else if (map.value !== property_id) { 
+    else if (value !== map.value) { 
+        console.log('update 2', name, variable[name], map)
       Observer(name, variable, 'update', map);
     }
 
     return true;
 
   } else if (map.value !== value) { 
+      console.log('update 3', name, variable[name], map)
     Observer(name, variable, 'update', map.value);
   }
  

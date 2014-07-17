@@ -3,6 +3,7 @@ var observe_lock = {};
 var object_map = {};
 var mapping_timer;
 var observable = !!Object.observe;
+var variable_to_object = {};
 
 Syc = {
   connect: function (socket) { 
@@ -70,9 +71,10 @@ function Name (name, variable) {
   if (name in Syc.variables) throw DuplicateNameError(name);
 
   Object.defineProperty(variable, 'syc-variable-name', {value: name, enumerable: false});
+   
   id = Meta(variable);
-
   Syc.variables[name] = id;
+  variable_to_object[name] = {};
 
   var description = Describe_Recursive(variable);
 
@@ -312,8 +314,9 @@ function Traverse () {
   }
 
   // Start the recursion
-  for (id in Syc.variables) { 
-    Map(Syc.objects[Syc.variables[id]]);
+  for (name in Syc.variables) { 
+    variable_to_object[name] = {};
+    Map(Syc.objects[Syc.variables[name]], name);
   }
 
   // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
@@ -324,19 +327,22 @@ function Traverse () {
   }
 }
 
-function Map (variable) {
+function Map (variable, name, path) {
   var id = variable['syc-object-id'];
 
   if (id === undefined) throw 'Sanity Check: polyfill cannot determine object id';
+  if (path === undefined) { var path = [] }
 
-  var proceed = Per_Variable(variable, id);
+  var proceed = Per_Object(variable, id, name, path);
 
-  if (proceed) { 
+  if (proceed) {
     for (property in variable) {
       var recur = Per_Property(variable, property, id);
 
-      if (recur) { 
-        Map(variable[property]);
+      if (recur) {
+        path.push(path)
+        Map(variable[property], name, path);
+        path.pop();
       }
     }
   }
@@ -344,7 +350,7 @@ function Map (variable) {
   Map_Object(variable);
 }
 
-function Per_Variable (variable, id) { 
+function Per_Object (variable, id, name, path) { 
   if (id in visited) { 
     if (visited[id]) return false;
     else visited[id] = true;
@@ -353,6 +359,7 @@ function Per_Variable (variable, id) {
   }
 
   var map = object_map[id];
+  variable_to_object[name][id] = [path.slice(0)];
 
   for (property in map) {
     if (!(property in variable)) { 

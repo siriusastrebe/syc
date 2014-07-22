@@ -3,7 +3,7 @@ var observe_lock = {};
 var object_map = {};
 var mapping_timer;
 var observable = !!Object.observe;
-var variable_to_object = {};
+var object_paths = {};
 
 Syc = {
   connect: function (socket) { 
@@ -74,7 +74,6 @@ function Name (name, variable) {
    
   id = Meta(variable);
   Syc.variables[name] = id;
-  variable_to_object[name] = {};
 
   var description = Describe_Recursive(variable);
 
@@ -315,7 +314,7 @@ function Traverse () {
 
   // Start the recursion
   for (name in Syc.variables) { 
-    variable_to_object[name] = {};
+    object_paths[name] = {};
     Map(Syc.objects[Syc.variables[name]], name);
   }
 
@@ -351,15 +350,15 @@ function Map (variable, name, path) {
 }
 
 function Per_Object (variable, id, name, path) { 
-  if (id in visited) { 
-    if (visited[id]) return false;
-    else visited[id] = true;
-  } else {
-    throw "Sanity check: id " + id + " not given a mark for garbage collection." 
+  if (visited[id]) { 
+    return false;
+    object_paths[name][id].push(path.slice(0));
+  } else { 
+    visited[id] = true;
+    object_paths[name][id] = [path.slice(0)];
   }
 
   var map = object_map[id];
-  variable_to_object[name][id] = [path.slice(0)];
 
   for (property in map) {
     if (!(property in variable)) { 
@@ -425,6 +424,17 @@ function Observer (name, object, type, old_value) {
   Observed([changes]);
 }
 
+
+function Object_Path_via_variable (target_id, variable_name) {
+  var origin_id = Syc.list(variable_name);
+  return Path(target_id, origin_id);
+}
+
+function Path (target_id, origin_id) {
+  var path = object_paths[target_id];
+  for 
+  
+}
 
 
 

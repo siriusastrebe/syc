@@ -11,12 +11,16 @@ Syc = {
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
     Reset(socket);
     
-    if (!mapping_timer) mapping_timer = setInterval(Traverse, 6001);
+    if (!mapping_timer) mapping_timer = setInterval(Traverse, 600);
   },
   
   sync: function (name) {
     Verify(this);
     Name(name, this);
+  },
+
+  getPath: function (object, variable_name) { 
+    return Path(object['syc-object-id'], variable_name);
   },
 
   variables: {},
@@ -339,7 +343,7 @@ function Map (variable, name, path) {
       var recur = Per_Property(variable, property, id);
 
       if (recur) {
-        path.push(path)
+        path.push(property)
         Map(variable[property], name, path);
         path.pop();
       }
@@ -350,12 +354,12 @@ function Map (variable, name, path) {
 }
 
 function Per_Object (variable, id, name, path) { 
-  if (visited[id]) { 
-    return false;
-    object_paths[name][id].push(path.slice(0));
-  } else { 
+  if (!visited[id]) { 
     visited[id] = true;
     object_paths[name][id] = [path.slice(0)];
+  } else { 
+    return false;
+    object_paths[name][id].push(path.slice(0));
   }
 
   var map = object_map[id];
@@ -425,15 +429,47 @@ function Observer (name, object, type, old_value) {
 }
 
 
+/*
 function Object_Path_via_variable (target_id, variable_name) {
   var origin_id = Syc.list(variable_name);
   return Path(target_id, origin_id);
 }
+*/
 
-function Path (target_id, origin_id) {
-  var path = object_paths[target_id];
-  for 
-  
+function Path (target_id, variable_name) {
+  /* This fat function is necessitated by Traversals not traversing
+  down objects that have been visited already. As a result, the
+  paths saved in object_paths for any object will list all paths that 
+  converge on that object, but it won't propagate paths (beyond the first) 
+  to its decendants.
+  */
+
+  var origin = Syc.variables[variable_name];
+  var full_path = [];
+
+  console.log(object_paths);
+  var paths = object_paths[variable_name][target_id];
+
+  full_paths.concat(paths);
+
+  for (path_number in paths) { 
+    var path = paths[path_number];
+
+    for (step in path) {
+      var step_id = path[step];
+      var convergences = object_paths[variable_name][step_id];
+
+      if (convergences.length > 1) {
+        for (var i = 1; i < convergences.length; i++) { 
+          var remainder = path.slice(path.indexOf(path[step]) + 1);
+
+          full_paths.push(convergences[i].concat(remainder));
+        }
+      }
+    }
+  }
+
+  return full_paths;
 }
 
 

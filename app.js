@@ -46,9 +46,22 @@ y = new syc.sync('BRO');
 //setTimeout(function () {
 //setInterval(function () { v[i] = i; i++ }, 7000);
 //v[i++] = [1, 2, 5, 7, 8];
-v[0] = [[1, 2,], [3, 4]];
-v[1] = {};
+var i = 0;
 
+v[i++] = [[1, 2,], [3, 4]];
+v[i++] = {};
+
+v[i] = [[], []];
+v[i][0].push('yo');
+v[i][1].push(v[i][0][0]);
+
+i++;
+
+
+setTimeout(function () { 
+  console.log(syc.getPath(v[2][0][0]));
+}, 6000);
+/*
 setInterval(function () { 
   v[1][random_word()] = random_word();
 }, 5500);
@@ -61,6 +74,7 @@ function random_word () {
   return split[Math.floor(Math.random() * (split.length))]
 }
 
+*/
 
 
 /*

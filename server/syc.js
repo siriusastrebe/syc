@@ -436,40 +436,39 @@ function Object_Path_via_variable (target_id, variable_name) {
 
 function Path (target_id, variable_name) {
   var origin = Syc.objects[Syc.variables[variable_name]],
-      paths = object_paths[variable_name][target_id].slice(0), // Create a copy so we don't tamper the original.
-      all_paths = [];
-
+      paths = object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
 
   for (path_number in paths) { 
     var path = paths[path_number];
     
-    all_paths.push(All_Paths(path, origin, variable_name));
+    paths.push(Hidden_Paths(path, origin, variable_name));
   }
 
-  return all_paths;
+  return paths;
 
 
-  function All_Paths(path, object, variable_name, index) { 
+  function Hidden_Paths(path, object, variable_name, index) { 
     /* This fat function is necessitated by Traversals not traversing
     down through objects that have been visited already, failing to record 
     all possible paths to the target. */
 
     var id = object['syc-object-id'],
         paths = object_paths[variable_name][id];
-        new_paths = [],
         index = index || 0,
-        next = object[path[index]]
+        next = object[path[index]],
+        new_paths = [];
 
     if (paths.length > 0) { 
+
       for (var i=1; i<paths.length; i++) { 
-        var new_path = paths[i].concat(path.splice(index));
+        var new_path = paths[i].concat(path.slice(index));
         new_paths.push(new_path);
       }
     }
 
-    if (next) { 
-      return new_paths.concat(All_Paths(path, next, variable_name, index+1));
-    } else {
+    if (index < path.length-1) { 
+      return new_paths.concat(Hidden_Paths(path, next, variable_name, index+1));
+    } else if (new_paths.length > 0) {
       return new_paths;
     }
   }

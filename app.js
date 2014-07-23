@@ -51,16 +51,16 @@ var i = 0;
 v[i++] = [[1, 2,], [3, 4]];
 v[i++] = {};
 
-v[i] = [[], []];
-v[i][0].push('yo');
-v[i][1].push(v[i][0][0]);
+v[i] = [[[]], []];
+v[i][0][0].push('yo');
+v[i][1].push(v[i][0]);
 
 i++;
 
 
 setTimeout(function () { 
-  console.log(syc.getPath(v[2][0][0]));
-}, 6000);
+  console.log(syc.getPath(v[2][0][0], 'YO'));
+}, 5000);
 /*
 setInterval(function () { 
   v[1][random_word()] = random_word();

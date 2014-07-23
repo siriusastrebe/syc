@@ -358,8 +358,8 @@ function Per_Object (variable, id, name, path) {
     visited[id] = true;
     object_paths[name][id] = [path.slice(0)];
   } else { 
-    return false;
     object_paths[name][id].push(path.slice(0));
+    return false;
   }
 
   var map = object_map[id];
@@ -385,27 +385,23 @@ function Per_Property (variable, name, variable_id) {
   }
 
   else if (map.type !== type) { 
-      console.log('update 0', name, variable[name], map)
     Observer(name, variable, 'update', map);
   }
 
   else if (type === 'array' || type === 'object') { 
     if (value === undefined) {
-        console.log('update 1', name, variable[name], map)
       Observer(name, variable, 'update ', map);
 
       return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
     }
 
     else if (value !== map.value) { 
-        console.log('update 2', name, variable[name], map)
       Observer(name, variable, 'update', map);
     }
 
     return true;
 
   } else if (map.value !== value) { 
-      console.log('update 3', name, variable[name], map)
     Observer(name, variable, 'update', map.value);
   }
  
@@ -436,40 +432,47 @@ function Object_Path_via_variable (target_id, variable_name) {
 }
 */
 
+
+
 function Path (target_id, variable_name) {
-  /* This fat function is necessitated by Traversals not traversing
-  down objects that have been visited already. As a result, the
-  paths saved in object_paths for any object will list all paths that 
-  converge on that object, but it won't propagate paths (beyond the first) 
-  to its decendants.
-  */
+  var origin = Syc.objects[Syc.variables[variable_name]],
+      paths = object_paths[variable_name][target_id].slice(0), // Create a copy so we don't tamper the original.
+      all_paths = [];
 
-  var origin = Syc.variables[variable_name];
-  var full_path = [];
-
-  console.log(object_paths);
-  var paths = object_paths[variable_name][target_id];
-
-  full_paths.concat(paths);
 
   for (path_number in paths) { 
     var path = paths[path_number];
-
-    for (step in path) {
-      var step_id = path[step];
-      var convergences = object_paths[variable_name][step_id];
-
-      if (convergences.length > 1) {
-        for (var i = 1; i < convergences.length; i++) { 
-          var remainder = path.slice(path.indexOf(path[step]) + 1);
-
-          full_paths.push(convergences[i].concat(remainder));
-        }
-      }
-    }
+    
+    all_paths.push(All_Paths(path, origin, variable_name));
   }
 
-  return full_paths;
+  return all_paths;
+
+
+  function All_Paths(path, object, variable_name, index) { 
+    /* This fat function is necessitated by Traversals not traversing
+    down through objects that have been visited already, failing to record 
+    all possible paths to the target. */
+
+    var id = object['syc-object-id'],
+        paths = object_paths[variable_name][id];
+        new_paths = [],
+        index = index || 0,
+        next = object[path[index]]
+
+    if (paths.length > 0) { 
+      for (var i=1; i<paths.length; i++) { 
+        var new_path = paths[i].concat(path.splice(index));
+        new_paths.push(new_path);
+      }
+    }
+
+    if (next) { 
+      return new_paths.concat(All_Paths(path, next, variable_name, index+1));
+    } else {
+      return new_paths;
+    }
+  }
 }
 
 

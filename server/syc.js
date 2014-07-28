@@ -4,6 +4,7 @@ var object_map = {};
 var mapping_timer;
 var observable = !!Object.observe;
 var object_paths = {};
+var watchers = {};
 
 Syc = {
   connect: function (socket) { 
@@ -22,6 +23,14 @@ Syc = {
   getPath: function (object, variable_name) { 
     return Path(object['syc-object-id'], variable_name);
   },
+
+  watch: function (variable_name, func) { 
+    if (!(variable_name in watchers)) {
+      throw "No syc variable by the name " + variable_name;
+    }
+ 
+    watchers[variable_name].push(func);
+  }
 
   variables: {},
   objects: {}
@@ -78,6 +87,7 @@ function Name (name, variable) {
    
   id = Meta(variable);
   Syc.variables[name] = id;
+  watchers[name] = [];
 
   var description = Describe_Recursive(variable);
 
@@ -93,6 +103,7 @@ function Observed (changes) {
         property = changes[change].name,
         changed = object[property],
         type = Standardize_Change_Type(changes[change].type),
+        old_value = changes[change].old_value;
         id = object['syc-object-id'];
 
     var changes;
@@ -101,7 +112,9 @@ function Observed (changes) {
       delete observe_lock[id]; return
     }
 
-    changes = Describe(changed);
+    changes = Describe(changed, object, property);
+
+    Awaken_Watchers(object);
 
     Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
@@ -116,8 +129,36 @@ function Standardize_Change_Type (type) {
   return type;
 }
 
+function Awaken_Watchers (object) { 
+  var watches = Check_Watchers(object);
+}
+
+function Check_Watchers (object, path, triggers, visited) {
+  var path = path || [],
+      triggers = triggers || {},
+      visited = visited || [],
+      object_id = object['syc-object-id'],
+      variable_name = object['syc-variable-name'],
+      parents = object['syc-path-names'];
+
+  if (object_id in visited) { return }
+  else { visited.push(object_id) }
+
+  if (variable_name === undefined) { 
+    // this'll be where a deep-observe verification will occur
+
+    for (id in parents) {
+      path.push(parents[id][0]);
+      triggers = Check_Watchers(Syc.objects[id], path, triggers, visited);
+      path.pop()
+    }
+  } else {
+    return triggers[variable_name] = watchers[variable_name];
+  } 
+}
+
 /* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
-function Describe (variable) { 
+function Describe (variable, parent, pathname) { 
   var type = Type(variable),
       value = Evaluate(type, variable);
 
@@ -127,6 +168,8 @@ function Describe (variable) {
 
       value = Meta(variable);
 
+      Update_Path(variable, parent, pathname, 'add');
+
       for (property in variable) {
         properties[property] = Describe(variable[property]);
       }
@@ -135,6 +178,7 @@ function Describe (variable) {
 
       return {type: type, id: value, properties: properties};
     } else { 
+      Update_Path(variable, parent, pathname, 'add');
       return {type: type, id: value};
     }
   } else { 
@@ -142,7 +186,24 @@ function Describe (variable) {
   }
 }
 
+function Update_Path (variable, parent, pathname, mode) { 
+  var parent_id = parent['syc-object-id'],
+      paths = variable['syc-path-names'],
+      specific_paths = paths[parent_id];
+
+  if (mode === 'add') { 
+    if (specific_paths !== undefined) { 
+      if (specific_paths.indexOf(pathname) === -1) { 
+        specific_paths.push(pathname);
+      }
+    } else { 
+      paths[parent_id] = [pathname];
+    }
+  }
+}
+
 function Describe_Recursive (variable, visited) { 
+  // TODO: Can this be replaced with the current mapping?
   var type = Type(variable),
       value = Evaluate(type, variable);
 
@@ -236,6 +297,8 @@ function Meta (variable, id) {
 
   var id = id || token();
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
+
+  Object.defineProperty(variable, 'syc-path-names', {value: {}, enumerable: false});
 
   Syc.objects[id] = variable;
 

@@ -441,7 +441,10 @@ function Path (target_id, variable_name) {
   for (path_number in paths) { 
     var path = paths[path_number];
     
-    paths.push(Hidden_Paths(path, origin, variable_name));
+    var hidden = Hidden_Paths(path, origin, variable_name);
+    if (hidden.length > 0) { 
+      paths.push(hidden);
+    }
   }
 
   return paths;
@@ -468,7 +471,7 @@ function Path (target_id, variable_name) {
 
     if (index < path.length-1) { 
       return new_paths.concat(Hidden_Paths(path, next, variable_name, index+1));
-    } else if (new_paths.length > 0) {
+    } else {
       return new_paths;
     }
   }

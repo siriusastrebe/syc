@@ -57,6 +57,8 @@ v[i][1].push(v[i][0][0]);
 
 i++;
 
+v[i] = v[i-1][0][0];
+
 
 setTimeout(function () { 
   console.log(syc.getPath(v[2][0][0], 'YO'));

@@ -129,6 +129,48 @@ function Standardize_Change_Type (type) {
   return type;
 }
 
+// This function is the mushu of functions. It awakens all the ancestors
+// so that the watcher may be roused.
+function Awaken_Watchers (object) { 
+  triggers = Awaken_Ancestors(object);
+
+  for (name in watchers) { 
+    if (Syc.variables[name] in triggers) { 
+      Compile_Paths(); 
+      watchers[name]() // Wooo, get to do dis
+    }
+  }
+}
+
+function Awaken_Ancestors (object, cumulative_path, visited) { 
+  var parents = object['syc-path-names'],
+      id = object['syc-object-id'],
+      cumulative_path = cumulative_path || [],
+      visited = visited || {};
+
+  var preserved_path = cumulative_path.clone(0); // Make a copy here so it isn't fussed with later on
+
+  if (id in visited) {
+    visited[id].push(preserved_path);
+    return;
+  } else {  
+    visited[id] = [preserved_path];
+  }
+
+  for (parent_id in parents) { 
+    var paths = parents[parent_id];
+
+    paths.forEach( function (path) { 
+      cumulative_path.push(path);
+      return Awaken_Ancestors(Syc.objects[parent_id], cumulative_path);
+      cumulative_path.pop();
+    });
+  }
+  
+  return visited;
+}
+
+/*
 function Awaken_Watchers (object) { 
   var watches = Check_Watchers(object);
 }
@@ -156,6 +198,7 @@ function Check_Watchers (object, path, triggers, visited) {
     return triggers[variable_name] = watchers[variable_name];
   } 
 }
+*/
 
 /* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
 function Describe (variable, parent, pathname) { 

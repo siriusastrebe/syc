@@ -65,7 +65,7 @@ v[i] = {}
 
 
 syc.watch('YO', function (object, property, paths, type, old_value) { 
-  console.log(object[property], paths, type, old_value);
+//  console.log(object[property], paths, type, old_value);
 });
 
 frank = v[i];
@@ -81,7 +81,7 @@ setInterval(function () {
   } 
 
   frank = frank[rand];
-}, 5500);
+}, 500);
 
 
 function random_word () { 

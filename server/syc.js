@@ -137,7 +137,7 @@ function Awaken_Watchers (object, property, type, old_value) {
       var watcher = Syc.objects[watcher_id];
 
       var paths = Compile_Paths(watcher, ancestors, id); 
-
+      
       watchers[name].forEach( function (trigger) { 
         trigger(object, property, paths, type, old_value);
       });
@@ -169,30 +169,23 @@ function Awaken_Watchers (object, property, type, old_value) {
   }
 
   function Compile_Paths (object, route_table, destination, path) { 
-    try{ 
     var id = object['syc-object-id'],
         path = path || [],
         paths = [];
-    } catch (e) { 
-      console.log(path);
-    }
         
     if (id === destination) { 
       return [path.slice(0)];
     }
   
-    try { 
     route_table[id].forEach( function (property) { 
       path.push(property);
 
+      console.log(id, property);
       var results = Compile_Paths(object[property], route_table, destination, path);
       paths = paths.concat(results);
 
       path.pop(property);
     });
-    } catch (e) { 
-      console.log(route_table, id, path, paths);
-    }
 
     return paths;
   }
@@ -243,7 +236,7 @@ function Describe (variable, parent, pathname) {
       Update_Path(variable, parent, pathname, 'add');
 
       for (property in variable) {
-        properties[property] = Describe(variable[property]);
+        properties[property] = Describe(variable[property], variable, property);
       }
 
       Map_Object(variable);

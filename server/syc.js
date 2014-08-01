@@ -20,17 +20,13 @@ Syc = {
     Name(name, this);
   },
 
-  getPath: function (object, variable_name) { 
-    return Path(object['syc-object-id'], variable_name);
-  },
-
   watch: function (variable_name, func) { 
     if (!(variable_name in watchers)) {
       throw "No syc variable by the name " + variable_name;
     }
  
     watchers[variable_name].push(func);
-  }
+  },
 
   variables: {},
   objects: {}
@@ -114,7 +110,7 @@ function Observed (changes) {
 
     changes = Describe(changed, object, property);
 
-    Awaken_Watchers(object);
+    Awaken_Watchers(object, property, type, old_value);
 
     Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
@@ -136,13 +132,15 @@ function Awaken_Watchers (object, property, type, old_value) {
       id = object['syc-object-id'];
 
   for (name in watchers) { 
-    if (Syc.variables[name] in triggers) { 
-      var watcher_id = Syc.variables[name],
-          watcher = Syc.objects[watcher];
+    var watcher_id = Syc.variables[name];
+    if (watcher_id in ancestors) { 
+      var watcher = Syc.objects[watcher_id];
 
       var paths = Compile_Paths(watcher, ancestors, id); 
 
-      watchers[name](object, property, paths, type, old_value) // Wooo, get to do dis
+      watchers[name].forEach( function (trigger) { 
+        trigger(object, property, paths, type, old_value);
+      });
     }
   }
 
@@ -171,22 +169,32 @@ function Awaken_Watchers (object, property, type, old_value) {
   }
 
   function Compile_Paths (object, route_table, destination, path) { 
+    try{ 
     var id = object['syc-object-id'],
         path = path || [],
         paths = [];
+    } catch (e) { 
+      console.log(path);
+    }
         
     if (id === destination) { 
-      return [path.clone(0)];
+      return [path.slice(0)];
     }
   
+    try { 
     route_table[id].forEach( function (property) { 
       path.push(property);
 
-      var results = Compile_Paths(object.property, route_table, destination, path);
-      path = paths.concat(results);
+      var results = Compile_Paths(object[property], route_table, destination, path);
+      paths = paths.concat(results);
 
       path.pop(property);
     });
+    } catch (e) { 
+      console.log(route_table, id, path, paths);
+    }
+
+    return paths;
   }
 }
 
@@ -266,7 +274,7 @@ function Update_Path (variable, parent, pathname, mode) {
   }
 }
 
-function Describe_Recursive (variable, visited) { 
+function Describe_Recursive (variable, visited, parent, pathname) { 
   // TODO: Can this be replaced with the current mapping?
   var type = Type(variable),
       value = Evaluate(type, variable);
@@ -276,6 +284,10 @@ function Describe_Recursive (variable, visited) {
       value = Meta(variable);
     }
 
+    if (parent) { 
+      Update_Path(variable, parent, pathname, 'add');
+    }
+
     if (visited === undefined) var visited = [];
     if (visited.indexOf(value) !== -1) return {type: type, id: value};
     visited.push(id);
@@ -283,7 +295,7 @@ function Describe_Recursive (variable, visited) {
     var properties = {};
 
     for (property in variable) {
-      properties[property] = Describe_Recursive(variable[property], visited);
+      properties[property] = Describe_Recursive(variable[property], visited, variable, property);
     }
 
     Map_Object(variable);

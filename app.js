@@ -59,13 +59,28 @@ i++;
 
 v[i] = v[i-1][0][0];
 
+i++
 
-setTimeout(function () { 
-  console.log(syc.getPath(v[2][0][0], 'YO'));
-}, 5000);
-/*
+v[i] = {}
+
+
+syc.watch('YO', function (object, property, paths, type, old_value) { 
+  console.log(object[property], paths, type, old_value);
+});
+
+frank = v[i];
+bob = v[i];
+
 setInterval(function () { 
-  v[1][random_word()] = random_word();
+  var rand = random_word();
+  frank[rand] = {}
+  if (rand.substring(0, 1) === 'a') { 
+    var randy = random_word();
+    bob[randy] = frank;
+    bob = bob[randy];
+  } 
+
+  frank = frank[rand];
 }, 5500);
 
 
@@ -76,7 +91,6 @@ function random_word () {
   return split[Math.floor(Math.random() * (split.length))]
 }
 
-*/
 
 
 /*

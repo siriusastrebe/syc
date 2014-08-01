@@ -131,44 +131,65 @@ function Standardize_Change_Type (type) {
 
 // This function is the mushu of functions. It awakens all the ancestors
 // so that the watcher may be roused.
-function Awaken_Watchers (object) { 
-  triggers = Awaken_Ancestors(object);
+function Awaken_Watchers (object, property, type, old_value) { 
+  var ancestors = Awaken_Ancestors(object),
+      id = object['syc-object-id'];
 
   for (name in watchers) { 
     if (Syc.variables[name] in triggers) { 
-      Compile_Paths(); 
-      watchers[name]() // Wooo, get to do dis
+      var watcher_id = Syc.variables[name],
+          watcher = Syc.objects[watcher];
+
+      var paths = Compile_Paths(watcher, ancestors, id); 
+
+      watchers[name](object, property, paths, type, old_value) // Wooo, get to do dis
     }
   }
-}
 
-function Awaken_Ancestors (object, cumulative_path, visited) { 
-  var parents = object['syc-path-names'],
-      id = object['syc-object-id'],
-      cumulative_path = cumulative_path || [],
-      visited = visited || {};
+  function Awaken_Ancestors (object, property, visited, old_value) { 
+    var parents = object['syc-path-names'],
+        id = object['syc-object-id'],
+        property = property || {}
+        visited = visited || {};
 
-  var preserved_path = cumulative_path.clone(0); // Make a copy here so it isn't fussed with later on
+    if (id in visited) {
+      visited[id].push(property);
+      return;
+    } else {  
+      visited[id] = [property];
+    }
 
-  if (id in visited) {
-    visited[id].push(preserved_path);
-    return;
-  } else {  
-    visited[id] = [preserved_path];
+    for (parent_id in parents) { 
+      var paths = parents[parent_id];
+  
+      paths.forEach( function (path) { 
+        return Awaken_Ancestors(Syc.objects[parent_id], path, visited);
+      });
+    }
+  
+    return visited;
   }
 
-  for (parent_id in parents) { 
-    var paths = parents[parent_id];
+  function Compile_Paths (object, route_table, destination, path) { 
+    var id = object['syc-object-id'],
+        path = path || [],
+        paths = [];
+        
+    if (id === destination) { 
+      return [path.clone(0)];
+    }
+  
+    route_table[id].forEach( function (property) { 
+      path.push(property);
 
-    paths.forEach( function (path) { 
-      cumulative_path.push(path);
-      return Awaken_Ancestors(Syc.objects[parent_id], cumulative_path);
-      cumulative_path.pop();
+      var results = Compile_Paths(object.property, route_table, destination, path);
+      path = paths.concat(results);
+
+      path.pop(property);
     });
   }
-  
-  return visited;
 }
+
 
 /*
 function Awaken_Watchers (object) { 

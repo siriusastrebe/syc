@@ -49,6 +49,29 @@ And on the client:
 
 Now syc will be able to sync variables with this client.
 
+## Watchers (Client and Server Side)
+
+    function alertMe (object, property, paths, type, old_value) {
+        alert(object[property]);
+    }
+    
+    syc.watch('synced', function)
+
+This will pop up an alert every time an object bound to the variable 'synced' is modified.
+
+    synced.ascending = [1, 2, 3, 4]
+
+At this point alertMe will be called, and you will see an alert listing 1,2,3,4.
+
+`type` is the change type for the object, and can take the values `add`, `delete`, or `update`.
+
+`paths` is a list of paths to the object that has been modified from the root of the object structure. For example, if you were to modify the newly created property `ascending` as such:
+
+    synced.ascending[4] = {value: 'five'}
+
+then alertMe would be called with the argument `property` set to `4` and `paths` being set to `[['ascending']]`, meaning you can access the modified value via `synced['ascending'][4]`. Multiple paths to the same object will be listed, but loops and circular references are ignored.
+
+
 
 - - - 
 This library is a work in progress, don't mind the extra files lying around. All you need is server/syc.js and client/syc.js.

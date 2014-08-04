@@ -181,7 +181,16 @@ function Awaken_Watchers (object, property, type, old_value) {
       path.push(property);
 
       console.log(id, property);
+      try { 
       var results = Compile_Paths(object[property], route_table, destination, path);
+      } catch (e) { 
+        if (e !== 'hahaha') { 
+          var props = []
+          for (p  in object) { props.push(p) }
+          console.log('\n\n\n', path, '\n\n', property, '\n\n', route_table[id], '\n\n', object, '\n\n', e)
+        }
+        throw 'hahaha'
+      } 
       paths = paths.concat(results);
 
       path.pop(property);
@@ -283,7 +292,7 @@ function Describe_Recursive (variable, visited, parent, pathname) {
 
     if (visited === undefined) var visited = [];
     if (visited.indexOf(value) !== -1) return {type: type, id: value};
-    visited.push(id);
+    visited.push(value);
 
     var properties = {};
 
@@ -371,7 +380,7 @@ function Meta (variable, id) {
 
   Syc.objects[id] = variable;
 
-  if (Object.observe) Object.observe(variable, Observed);
+  if (observable) Object.observe(variable, Observed);
   
   function token () { 
     // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
@@ -512,6 +521,8 @@ function Per_Property (variable, name, variable_id) {
 
   var map = object_map[variable_id][name];
 
+  console.log(map, name, type, value, variable_id);
+
   if (map === undefined) {
     Observer(name, variable, 'add');
   }
@@ -545,9 +556,7 @@ function Observer (name, object, type, old_value) {
 
   if (old_value) { 
     if (old_value.type === 'array' || old_value.type === 'object') { 
-      if (old_value.value in Syc.objects) { 
-        changes.old_value = Syc.objects[old_value.value];
-      }
+      changes.old_value = Syc.objects[old_value.value];
     } else {
       changes.old_value = old_value;
     }

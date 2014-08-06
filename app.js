@@ -66,7 +66,7 @@ v[i] = {}
 
 
 syc.watch('YO', function (object, property, paths, type, old_value) { 
-//  console.log(object[property], paths, type, old_value);
+  console.log(object[property], paths, type, old_value);
 });
 
 
@@ -74,7 +74,7 @@ setInterval(function() {
   var rand = random_word();
 //  v[i][rand] = 3;
   v[i][rand] = v[i];
-  console.log(rand);
+//  console.log(rand);
 }, 500);
 
 

@@ -180,17 +180,17 @@ function Awaken_Watchers (object, property, type, old_value) {
     route_table[id].forEach( function (property) { 
       path.push(property);
 
-      console.log(id, property);
-      try { 
+//      console.log(id, property);
+//      try { 
       var results = Compile_Paths(object[property], route_table, destination, path);
-      } catch (e) { 
+/*      } catch (e) { 
         if (e !== 'hahaha') { 
           var props = []
           for (p  in object) { props.push(p) }
           console.log('\n\n\n', path, '\n\n', property, '\n\n', route_table[id], '\n\n', object, '\n\n', e)
         }
         throw 'hahaha'
-      } 
+      } */
       paths = paths.concat(results);
 
       path.pop(property);
@@ -521,7 +521,7 @@ function Per_Property (variable, name, variable_id) {
 
   var map = object_map[variable_id][name];
 
-  console.log(map, name, type, value, variable_id);
+//  console.log(map, name, type, value, variable_id);
 
   if (map === undefined) {
     Observer(name, variable, 'add');

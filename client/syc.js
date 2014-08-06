@@ -73,11 +73,13 @@ var Syc = {
         variable,
         properties,
         value,
-        id; 
+        id, 
+        one_way;
      
     if (type === 'object' || type === 'array') { 
       properties = changes.properties,
-      id         = changes.id;
+      id         = changes.id,
+      one_way    = changes.one_way;
 
       if (id in Syc.objects) { 
         return Syc.objects[id];
@@ -85,7 +87,7 @@ var Syc = {
         if (type === 'object') variable = {};
         if (type === 'array') variable = [];
 
-        id = Syc.Meta(variable, id);
+        id = Syc.Meta(variable, one_way, id);
 
         for (property in properties) {
           variable[property] = Syc.Resolve(properties[property])
@@ -124,9 +126,16 @@ var Syc = {
           property = changes[change].name,
           changed = object[property],
           type = changes[change].type,
-          id = object['syc-object-id'];
+          id = object['syc-object-id'],
+          old_value = changes[change].old_value;
 
       if (Syc.observable && id in Syc.observe_lock) { delete Syc.observe_lock[id]; return }
+
+      if (object['syc-one-way'] === true) { 
+        changed = old_value;
+        throw "Syc error: Cannot make changes to a one-way variable.";
+        return;
+      } 
 
       var changes = Syc.Describe(changed);
 
@@ -140,7 +149,7 @@ var Syc = {
         value = Syc.Evaluate(type, variable);
 
     if (type === 'object' || type === 'array') { 
-      var id = variable['syc-object-id'];
+      var one_way = variable['syc-one-way'];
 
       if (id === undefined) { 
         var properties = {};
@@ -153,11 +162,11 @@ var Syc = {
 
         Syc.Map_Object(variable);
 
-        return {type: type, id: id, properties: properties};
+        return {type: type, id: value, one_way: one_way, properties: properties};
       } else { 
-        return {type: type, id: id} ;
+        return {type: type, id: value, one_way: one_way};
       }
-    } else { 
+    } else {
       return {type: type, value: value};
     }
   },
@@ -167,12 +176,16 @@ var Syc = {
   },
 
   // --- --- ------ ----  Helper Functions  ---- ---- ---- ----
-  Meta: function (variable, id) {
+  Meta: function (variable, one_way, id) {
     var id = id || token();
 
     Syc.objects[id] = variable;
     Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
     if (Object.observe) Object.observe(variable, Syc.Observed);
+
+    if (one_way) {
+      Object.defineProperty(variable, 'syc-one-way', {value: true, enumerable: false});
+    }
 
     function token () { 
       // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
@@ -222,7 +235,7 @@ var Syc = {
     for (obj in Syc.visited) { 
       if (!(Syc.visited[obj])) { 
         delete Syc.objects[obj];
-        console.log('deleted ' + obj);
+//        console.log('deleted ' + obj);
       }
     }
   },
@@ -278,7 +291,7 @@ var Syc = {
     }
 
     else if (map.type !== type) { 
-      console.log('update 0', name, variable[name], map)
+//      console.log('update 0', name, variable[name], map)
       Syc.Observer(name, variable, 'update', map);
     }
 
@@ -286,20 +299,20 @@ var Syc = {
       var property_id = property['syc-object-id'];
 
       if (property_id === undefined) {
-        console.log('update 1', name, variable[name], map)
+//        console.log('update 1', name, variable[name], map)
         Syc.Observer(name, variable, 'update ', map);
         return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
       }
 
       else if (map.value !== property_id) { 
-        console.log('update 2', name, variable[name], map)
+//        console.log('update 2', name, variable[name], map)
         Syc.Observer(name, variable, 'update', map);
       }
 
       return true;
 
     } else if (map.value !== value) { 
-      console.log('update 3', name, variable[name], map)
+//      console.log('update 3', name, variable[name], map)
       Syc.Observer(name, variable, 'update', map.value);
     }
  

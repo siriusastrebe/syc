@@ -16,9 +16,14 @@ Syc = {
   },
   
   sync: function (name) {
-    Verify(this);
+    Verify(this, 'sync');
     Name(name, this);
   },
+
+  serve: function (name) { 
+    Verify(this, 'serve');
+    Name(name, this);
+  }
 
   watch: function (variable_name, func) { 
     if (!(variable_name in watchers)) {
@@ -69,19 +74,17 @@ function Broadcast (title, data, sender) {
 }
 
 
-function Verify (variable) { 
-  if ( !(variable instanceof Syc.sync) )  
-    throw "Improper use of Syc.sync(). Try: 'new Syc.sync()'";
+function Verify_Sync (variable, kind) { 
+  if ( !(variable instanceof Syc.sync) && !(variable instanceof Syc.serve) ) {
+    throw "Improper use of Syc." + kind + "(). Try: 'new Syc." + kind + "()'";
 }
 
 
 /* ---- ---- ---- ----  Observing and New Variables  ---- ---- ---- ---- */
 function Name (name, variable) { 
   if (name in Syc.variables) throw DuplicateNameError(name);
-
-  Object.defineProperty(variable, 'syc-variable-name', {value: name, enumerable: false});
    
-  id = Meta(variable);
+  id = Meta(variable, true);
   Syc.variables[name] = id;
   watchers[name] = [];
 
@@ -237,10 +240,12 @@ function Describe (variable, parent, pathname) {
       value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
+    var one_way = variable['syc-one-way'];
+
     if (value === undefined) { 
       var properties = {};
 
-      value = Meta(variable);
+      value = Meta(variable, parent['syc-one-way']);
 
       Update_Path(variable, parent, pathname, 'add');
 
@@ -250,40 +255,31 @@ function Describe (variable, parent, pathname) {
 
       Map_Object(variable);
 
-      return {type: type, id: value, properties: properties};
+      return {type: type, id: value, properties: properties, one_way: one_way};
     } else { 
+      Variable_Compatibility(variable, parent, pathname);
+
       Update_Path(variable, parent, pathname, 'add');
-      return {type: type, id: value};
+
+      return {type: type, id: value, one_way: one_way};
     }
   } else { 
     return {type: type, value: value};
   }
 }
 
-function Update_Path (variable, parent, pathname, mode) { 
-  var parent_id = parent['syc-object-id'],
-      paths = variable['syc-path-names'],
-      specific_paths = paths[parent_id];
-
-  if (mode === 'add') { 
-    if (specific_paths !== undefined) { 
-      if (specific_paths.indexOf(pathname) === -1) { 
-        specific_paths.push(pathname);
-      }
-    } else { 
-      paths[parent_id] = [pathname];
-    }
-  }
-}
 
 function Describe_Recursive (variable, visited, parent, pathname) { 
-  // TODO: Can this be replaced with the current mapping?
   var type = Type(variable),
       value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
+    var one_way = variable['syc-one-way'];
+
     if (value === undefined) {
-      value = Meta(variable);
+      value = Meta(variable, parent['syc-one-way']);
+    } else { 
+      Variable_Compatibility(variable, parent, pathname);
     }
 
     if (parent) { 
@@ -302,11 +298,38 @@ function Describe_Recursive (variable, visited, parent, pathname) {
 
     Map_Object(variable);
 
-    return {type: type, id: value, properties: properties};
+    return {type: type, id: value, properties: properties, one_way: one_way};
   } else { 
     return {type: type, value: value};
   }
 }
+
+
+function Variable_Compatibility (variable, parent, pathname) { 
+  if (variable['syc-one-way'] !== parent['syc-one-way']) { 
+    delete parent[pathname];
+    throw "Syc error: Objects assigned to one-way served variables cannot be mixed with two-way synced objects."
+  }
+}
+
+
+function Update_Path (variable, parent, pathname, mode) { 
+  var parent_id = parent['syc-object-id'],
+      paths = variable['syc-path-names'],
+      specific_paths = paths[parent_id];
+
+  if (mode === 'add') { 
+    if (specific_paths !== undefined) { 
+      if (specific_paths.indexOf(pathname) === -1) { 
+        specific_paths.push(pathname);
+      }
+    } else { 
+      paths[parent_id] = [pathname];
+    }
+  }
+}
+
+
 
 
 function Receive_Change (data, socket) { 
@@ -316,6 +339,12 @@ function Receive_Change (data, socket) {
       changes   = data.changes;
 
   var variable = Syc.objects[id];
+
+  if (variable['syc-one-way'] === true) { 
+    console.warn('Syc alert: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
+    Reset(socket)
+  }
+
 
   if (variable === undefined)
     throw "Received changes to an unknown object: " + id;
@@ -340,11 +369,12 @@ function Apply_Changes (changes) {
       variable,
       properties,
       value,
-      id; 
+      id,
+      one_way;
    
   if (Recurrable(type)) { 
     properties = changes.properties,
-    id         = changes.id;
+    id         = changes.id,
 
     if (id in Syc.objects) { 
       return Syc.objects[id];
@@ -370,7 +400,7 @@ function Apply_Changes (changes) {
 
 
 // ---- ---- ---- ----  Object Conversion  ----- ---- ---- ---- 
-function Meta (variable, id) {
+function Meta (variable, one_way,  id) {
   if (variable['syc-object-id']) { throw "Already Existing object" };
 
   var id = id || token();
@@ -378,12 +408,15 @@ function Meta (variable, id) {
 
   Object.defineProperty(variable, 'syc-path-names', {value: {}, enumerable: false});
 
+  if (one_way) { 
+    Object.defineProperty(variable, 'syc-one-way', {value: true, enumerable: false});
+  }
+ 
   Syc.objects[id] = variable;
 
   if (observable) Object.observe(variable, Observed);
   
   function token () { 
-    // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
     function rand () { return Math.random().toString(36).substr(2) }
     var toke = rand() + rand();
     if (toke in Syc.objects) return token();

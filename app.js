@@ -43,42 +43,46 @@ v = new syc.sync('YO');
 
 y = new syc.sync('BRO');
 
-//setTimeout(function () {
-//setInterval(function () { v[i] = i; i++ }, 7000);
-//v[i++] = [1, 2, 5, 7, 8];
+z = new syc.serve('HO');
+
 var i = 0;
-/*
-v[i++] = [[1, 2,], [3, 4]];
-v[i++] = {};
-
-v[i] = [[[]], []];
-v[i][0][0].push('yo');
-v[i][1].push(v[i][0][0]);
-
-i++;
-
-v[i] = v[i-1][0][0];
-
-i++
-*/
 
 v[i] = {}
 
+/*
+// Test Aaron: Basic test for ensuring data passing
+v[i++] = [[1, 2,], [3, 4]];
+v[i++] = {};
 
-syc.watch('YO', function (object, property, paths, type, old_value) { 
-  console.log(object[property], paths, type, old_value);
-});
+// Test Betsy: Basic test for ensuring multi-referential data structure
+v[i] = [[[]], []];
+v[i][0][0].push('yo');
+v[i][1].push(v[i][0][0]);
+i++;
 
 
+*/
+
+
+
+
+/* 
+// Test Cathy, basic persistent test for comprehension of circular objects (Does not succeed currently)
 setInterval(function() { 
   var rand = random_word();
 //  v[i][rand] = 3;
   v[i][rand] = v[i];
 //  console.log(rand);
-}, 500);
+}, 6000);
+*/
 
 
 /*
+
+// Test Derek: persistent, massive scale test for complex path structures
+syc.watch('YO', function (object, property, paths, type, old_value) { 
+  console.log(object[property], paths, type, old_value);
+});
 
 frank = v[i];
 bob = v[i];
@@ -94,9 +98,6 @@ setInterval(function () {
 
   frank = frank[rand];
 }, 500);
-*/
-
-
 
 function random_word () { 
   english = "The mental features discoursed of as the analytical, are, in themselves, but little susceptible of analysis. We appreciate them only in their effects. We know of them, among other things, that they are always to their possessor, when inordinately possessed, a source of the liveliest enjoyment. As the strong man exults in his physical ability, delighting in such exercises as call his muscles into action, so glories the analyst in that moral activity which disentangles. He derives pleasure from even the most trivial occupations bringing his talents into play. He is fond of enigmas, of conundrums, of hieroglyphics; exhibiting in his solutions of each a degree of acumen which appears to the ordinary apprehension preternatural. His results, brought about by the very soul and essence of method, have, in truth, the whole air of intuition. The Canadian paused in his work. But one word twenty times repeated, one dreadful word, told me the reason for the agitation spreading aboard the Nautilus. We weren't the cause of the crew's concern.  Maelstrom! Maelstrom! they were shouting.  The Maelstrom! Could a more frightening name have rung in our ears under more frightening circumstances? Were we lying in the dangerous waterways off the Norwegian coast? Was the Nautilus being dragged into this whirlpool just as the skiff was about to detach from its plating?";
@@ -104,66 +105,21 @@ function random_word () {
   split = english.split(' ');
   return split[Math.floor(Math.random() * (split.length))]
 }
-
-
-
-/*
-a = 2
-setTimeout(function () { 
-  v[a] = a * a;
-  a++;
-}, 9000);
 */
 
-//v[i++] = [{a: '1', b: '2'}, {z: '3'}];
-//v[i++] = {Yeezus: 'ima let you finish, but', hank: 'Propane Accessories'};
-//  setTimeout(function () { 
-//    v[0].push(9); v[1].push(3); v[2][1]['y'] = '2';
-//  }, 1000);
-//}, 3000);
-
-
+// Test Emma: Basic test to confirm separation of one-way and two-way structures. It should error.
 /*
-setInterval(function () { 
-  var counter = 0;
-
-  var change_interval = setInterval( function () { 
-    var i = getI();
-    v[i] = []; 
-    for (var j=i; j--; j>0) {
-      v[i].push(j)
-    }
-
-    if (i > 10) i = 1;
-
-    var i = getI();
-    
-    v[i] = { left: recurse(Math.floor(Math.random() * 5)), right: recurse(Math.floor(Math.random() * 5)) }
-
-    counter++;
-
-  if (counter > 5) { clearInterval(change_interval) }
-  }, 1000);
-}, 30000);
-
-function recurse (depth) { 
-  if (depth === 0) return "8)";
-  var tumor = {}
-
-  tumor['left'] = recurse(depth-1);
-  tumor['right'] = recurse(depth-1);
-
-  return tumor;
-}
-
-function getI () { 
-  var a = i;
-  i++;
-  return a;
-}
-
-y['hello'] = 'world';
+v[i] = z;
 */
+
+// Test Frank: One-way variable integrity test
+z['Greek'] = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega']
+z['Phonecian'] = ['Aleph', 'Beth', 'Gimel', 'Daleth', 'He', 'Waw', 'Zayin', 'Heth', 'Teth', 'Yodh', 'Kaph', 'Lamedh', 'Mem', 'Nun', 'Samekh', '\'ayin', 'Pe', 'Sade', 'Qoph', 'Res', 'Sin', 'Taw', 'Waw']
+z[0] = z['Greek'][0];
+z[1] = z['Greek'][1];
+z[2] = {a: {b: {c: {d: ['e', 'f', 'g']}}}};
+
+
 
 
 

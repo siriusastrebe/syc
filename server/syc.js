@@ -22,8 +22,8 @@ Syc = {
 
   serve: function (name) { 
     Verify(this, 'serve');
-    Name(name, this);
-  }
+    Name(name, this, true);
+  },
 
   watch: function (variable_name, func) { 
     if (!(variable_name in watchers)) {
@@ -74,17 +74,20 @@ function Broadcast (title, data, sender) {
 }
 
 
-function Verify_Sync (variable, kind) { 
+function Verify (variable, kind) { 
   if ( !(variable instanceof Syc.sync) && !(variable instanceof Syc.serve) ) {
     throw "Improper use of Syc." + kind + "(). Try: 'new Syc." + kind + "()'";
+  }
 }
 
 
 /* ---- ---- ---- ----  Observing and New Variables  ---- ---- ---- ---- */
-function Name (name, variable) { 
+function Name (name, variable, one_way) { 
+  var one_way = one_way || false;
+
   if (name in Syc.variables) throw DuplicateNameError(name);
    
-  id = Meta(variable, true);
+  id = Meta(variable, one_way);
   Syc.variables[name] = id;
   watchers[name] = [];
 
@@ -240,12 +243,11 @@ function Describe (variable, parent, pathname) {
       value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
-    var one_way = variable['syc-one-way'];
-
     if (value === undefined) { 
       var properties = {};
+      var one_way = parent['syc-one-way'];
 
-      value = Meta(variable, parent['syc-one-way']);
+      value = Meta(variable, one_way);
 
       Update_Path(variable, parent, pathname, 'add');
 
@@ -257,6 +259,7 @@ function Describe (variable, parent, pathname) {
 
       return {type: type, id: value, properties: properties, one_way: one_way};
     } else { 
+      var one_way = variable['syc-one-way'];
       Variable_Compatibility(variable, parent, pathname);
 
       Update_Path(variable, parent, pathname, 'add');
@@ -277,8 +280,9 @@ function Describe_Recursive (variable, visited, parent, pathname) {
     var one_way = variable['syc-one-way'];
 
     if (value === undefined) {
-      value = Meta(variable, parent['syc-one-way']);
-    } else { 
+      one_way = parent['syc-one-way'];
+      value = Meta(variable, one_way);
+    } else if (parent) { 
       Variable_Compatibility(variable, parent, pathname);
     }
 
@@ -306,8 +310,14 @@ function Describe_Recursive (variable, visited, parent, pathname) {
 
 
 function Variable_Compatibility (variable, parent, pathname) { 
-  if (variable['syc-one-way'] !== parent['syc-one-way']) { 
+  console.log(variable['syc-one-way']);
+  console.log(parent['syc-one-way']);
+  console.log(pathname);
+  console.log('\n');
+  if (variable['syc-one-way'] !== parent['syc-one-way']) {
     delete parent[pathname];
+    var a = new Error();
+    console.log(a.stack);
     throw "Syc error: Objects assigned to one-way served variables cannot be mixed with two-way synced objects."
   }
 }
@@ -340,9 +350,11 @@ function Receive_Change (data, socket) {
 
   var variable = Syc.objects[id];
 
+  console.log(data);
+
   if (variable['syc-one-way'] === true) { 
-    console.warn('Syc alert: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
-    Reset(socket)
+    console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
+    Reset(socket);
   }
 
 
@@ -356,7 +368,7 @@ function Receive_Change (data, socket) {
   } else if (type === 'delete') { 
     delete variable[property];
   } else { 
-    throw 'Recieved changes for an unknown change type: ' + type;
+    console.warn('Syc warning: Recieved changes for an unknown change type: ' + type);
   }
 
   Map_Object(variable);
@@ -369,20 +381,24 @@ function Apply_Changes (changes) {
       variable,
       properties,
       value,
-      id,
-      one_way;
+      id;
    
   if (Recurrable(type)) { 
     properties = changes.properties,
-    id         = changes.id,
+    id         = changes.id;
 
     if (id in Syc.objects) { 
-      return Syc.objects[id];
+      var object = Syc.objects[id];
+      if (object['syc-one-way']) { 
+        console.warn('Syc warning: A client\'s attempted to reference a one-way variable from a two-way variable. Ignoring client request.');
+      } else {
+        return object;
+      }
     } else { 
       if (type === 'object') variable = {};
       if (type === 'array') variable = [];
 
-      id = Meta(variable, id);
+      id = Meta(variable, false, id);
       
       for (property in properties) {
         variable[property] = Apply_Changes(properties[property])

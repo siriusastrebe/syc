@@ -132,41 +132,46 @@ var Syc = {
       if (Syc.observable && id in Syc.observe_lock) { delete Syc.observe_lock[id]; return }
 
       if (object['syc-one-way'] === true) { 
-        changed = old_value;
+        if (old_value) { object[property] = old_value } 
+        else { delete object[property] }
         throw "Syc error: Cannot make changes to a one-way variable.";
         return;
       } 
 
-      var changes = Syc.Describe(changed);
+      var changes = Syc.Describe(changed, object, property);
 
       Syc.Socket.emit('syc-object-change', { id: id, type: type,  property: property, changes: changes });
     }
   },
 
 
-  Describe: function (variable) { 
+  Describe: function (variable, parent, path) { 
     var type = Syc.Type(variable),
         value = Syc.Evaluate(type, variable);
 
     if (type === 'object' || type === 'array') { 
-      var one_way = variable['syc-one-way'];
+      if (value === undefined) { 
 
-      if (id === undefined) { 
         var properties = {};
 
-        id = Syc.Meta(variable);
+        value = Syc.Meta(variable);
 
         for (property in variable) {
-          properties[property] = Syc.Describe(variable[property]);
+          properties[property] = Syc.Describe(variable[property], variable, property);
         }
 
         Syc.Map_Object(variable);
 
         return {type: type, id: value, one_way: one_way, properties: properties};
       } else { 
+        var one_way = variable['syc-one-way'];
         return {type: type, id: value, one_way: one_way};
       }
     } else {
+      if (variable['syc-one-way'] === true) { 
+        delete parent[path]
+        throw "Syc error: Cannot make a two-way variable reference a one-way variable"
+      }
       return {type: type, value: value};
     }
   },
@@ -235,7 +240,6 @@ var Syc = {
     for (obj in Syc.visited) { 
       if (!(Syc.visited[obj])) { 
         delete Syc.objects[obj];
-//        console.log('deleted ' + obj);
       }
     }
   },
@@ -291,7 +295,6 @@ var Syc = {
     }
 
     else if (map.type !== type) { 
-//      console.log('update 0', name, variable[name], map)
       Syc.Observer(name, variable, 'update', map);
     }
 
@@ -299,20 +302,17 @@ var Syc = {
       var property_id = property['syc-object-id'];
 
       if (property_id === undefined) {
-//        console.log('update 1', name, variable[name], map)
         Syc.Observer(name, variable, 'update ', map);
         return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
       }
 
       else if (map.value !== property_id) { 
-//        console.log('update 2', name, variable[name], map)
         Syc.Observer(name, variable, 'update', map);
       }
 
       return true;
 
     } else if (map.value !== value) { 
-//      console.log('update 3', name, variable[name], map)
       Syc.Observer(name, variable, 'update', map.value);
     }
  

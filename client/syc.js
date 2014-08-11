@@ -134,8 +134,7 @@ var Syc = {
       if (object['syc-one-way'] === true) { 
         if (old_value) { object[property] = old_value } 
         else { delete object[property] }
-        throw "Syc error: Cannot make changes to a one-way variable.";
-        return;
+        console.error("Syc error: Cannot make changes to a one-way variable.");
       } 
 
       var changes = Syc.Describe(changed, object, property);
@@ -150,7 +149,7 @@ var Syc = {
         value = Syc.Evaluate(type, variable);
 
     if (type === 'object' || type === 'array') { 
-      if (value === undefined) { 
+      if (value === undefined) {
 
         var properties = {};
 
@@ -162,16 +161,16 @@ var Syc = {
 
         Syc.Map_Object(variable);
 
-        return {type: type, id: value, one_way: one_way, properties: properties};
+        return {type: type, id: value, one_way: false, properties: properties};
       } else { 
         var one_way = variable['syc-one-way'];
+        if (one_way === true) { 
+          delete parent[path];
+          console.error("Syc error: Cannot make a two-way variable reference a one-way variable");
+        }
         return {type: type, id: value, one_way: one_way};
       }
     } else {
-      if (variable['syc-one-way'] === true) { 
-        delete parent[path]
-        throw "Syc error: Cannot make a two-way variable reference a one-way variable"
-      }
       return {type: type, value: value};
     }
   },

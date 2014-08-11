@@ -310,14 +310,8 @@ function Describe_Recursive (variable, visited, parent, pathname) {
 
 
 function Variable_Compatibility (variable, parent, pathname) { 
-  console.log(variable['syc-one-way']);
-  console.log(parent['syc-one-way']);
-  console.log(pathname);
-  console.log('\n');
   if (variable['syc-one-way'] !== parent['syc-one-way']) {
     delete parent[pathname];
-    var a = new Error();
-    console.log(a.stack);
     throw "Syc error: Objects assigned to one-way served variables cannot be mixed with two-way synced objects."
   }
 }
@@ -359,7 +353,7 @@ function Receive_Change (data, socket) {
 
 
   if (variable === undefined)
-    throw "Received changes to an unknown object: " + id;
+    console.warn("Received changes to an unknown object: " + id);
 
   if (observable) observe_lock[id] = true;
 
@@ -459,7 +453,7 @@ function Evaluate (type, value) {
 
   if (type === 'undefined') return undefined;
 
-  throw 'Object type ' + type + ' not supported by syc';
+  console.error('Object type ' + type + ' not supported by syc');
 }
 
 function Recurrable (type) {
@@ -523,7 +517,7 @@ function Traverse () {
 function Map (variable, name, path) {
   var id = variable['syc-object-id'];
 
-  if (id === undefined) throw 'Sanity Check: polyfill cannot determine object id';
+  if (id === undefined) throw 'Syc Sanity Check: polyfill cannot determine object id';
   if (path === undefined) { var path = [] }
 
   var proceed = Per_Object(variable, id, name, path);

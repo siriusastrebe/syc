@@ -13,21 +13,25 @@ Syc uses Object.observe if it's available for incredible responsiveness and perf
 
 To sync a variable from the server to the client:
 
+    // On the server side...
     var synced = new syc.sync('name')
     synced['hello'] = 'world';
     
 The client will be able to access this variable by getting the reference to it:
 
+    // On the client side...
     var synced = syc.list('name')
     synced.hello
     -> "world"
     
 You can change the data on either the server or the client...
     
+    // On the client side...
     synced.goodbye = "farewell!"
 
 And see the change reflected on every other client.
 
+    // On a different client...
     synced.goodbye
     -> "farewell!"
 
@@ -35,6 +39,7 @@ And see the change reflected on every other client.
 
 Syc utilizes socket.io but isn't a wrapper for it. So you'll have to initalize it as such:
 
+    // Server side setup
     var io = require('socket.io').listen(80),
         syc = require('syc');
 
@@ -44,10 +49,21 @@ Syc utilizes socket.io but isn't a wrapper for it. So you'll have to initalize i
 
 And on the client:
 
+    // Client side setup
     var socket = io.connect();
     Syc.connect(socket);
 
 Now syc will be able to sync variables with this client.
+
+## One-way Variables (Server side)
+
+    // Server side 
+    var served = new syc.serve('name')
+
+Serving a variable restricts the client from making any changes to data bound to the served variable. Useful for when you do not want a malicious client to tampering with the data. 
+
+*Note*: To ensure good practice, Syc forbids one-way served variables from referencing or being referenced by objects bound to two-way variables.
+
 
 ## Watchers (Client and Server Side)
 

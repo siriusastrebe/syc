@@ -26,12 +26,11 @@ The client will be able to access this variable by getting the reference to it:
     
 You can change the data on either the server or the client...
     
-    // On the client side...
     synced.goodbye = "farewell!"
 
 And see the change reflected on every other client.
 
-    // On a different client...
+    // On any client...
     synced.goodbye
     -> "farewell!"
 

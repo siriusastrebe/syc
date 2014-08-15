@@ -3,7 +3,7 @@ Syc
 
 If you're using Javascript on both the server and client, why worry about message passing from server to client?
 
-When you create a Syc variable, an identical variable will appear on the client side. Any changes to this variable will be communicated via socket.io instantaneously and will see those same changes on the client. Clients can modify the variable and have it reflected on the server side. It works under a simple principle: All data bound to the variable in question is identical between Server and Client.
+Syc syncs a variable from server to client. When you create a Syc variable, an identical variable will appear on the client side. Any changes to this variable will be communicated via socket.io instantaneously and will see those same changes on the client. Clients can modify the variable and have it reflected on the server side. It works under a simple principle: All data bound to the variable in question is identical between Server and Client.
 
 Like Meteor, but without the framework.
 
@@ -86,6 +86,19 @@ At this point alertMe will be called, and you will see an alert listing 1,2,3,4.
 
 then alertMe would be called with the argument `property` set to `4` and `paths` being set to `[['ascending']]`, meaning you can access the modified value via `synced['ascending'][4]`. Multiple paths to the same object will be listed, but loops and circular references are ignored.
 
+
+## Verifiers
+    
+    function Verify (object, callback);
+    function Verify_Complex (name, complex_callback);
+    
+    functionc callback (change, object, property, type, current_value) {
+      return change;
+    }
+    
+    function complex_callback (change, object, property, type, current_value, path) {
+      
+    }
 
 
 - - - 

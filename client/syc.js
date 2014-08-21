@@ -5,7 +5,7 @@ var Syc = {
     socket.on('syc-object-change', Syc.Receive_Change);
     socket.on('syc-variable-new', Syc.New_Variable);
 
-    if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, 6000);
+    if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, 600);
   },
 
   list: function (name) {
@@ -28,6 +28,7 @@ var Syc = {
 
   observe_lock: {},
   object_map: {},
+  object_paths: {},
 
   observable: !!Object.observe,
 
@@ -231,8 +232,9 @@ var Syc = {
     }
 
     // Start the recursion
-    for (id in Syc.variables) { 
-      Syc.Map(Syc.objects[Syc.variables[id]]);
+    for (name in Syc.variables) { 
+      Syc.object_paths[name] = {};
+      Syc.Map(Syc.objects[Syc.variables[name]], name);
     }
 
     // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
@@ -243,19 +245,22 @@ var Syc = {
     }
   },
 
-  Map: function (variable) {
+  Map: function (variable, name, path) {
     var id = variable['syc-object-id'];
 
     if (id === undefined) throw 'Sanity Check: polyfill cannot determine object id';
+    if (path === undefined) { var path = [] }
 
-    var proceed = Syc.Per_Variable(variable, id);
+    var proceed = Syc.Per_Object(variable, id, name, path);
 
     if (proceed) { 
       for (property in variable) {
         var recur = Syc.Per_Property(variable, property, id);
 
         if (recur) { 
-          Syc.Map(variable[property]);
+          path.push(property)
+          Syc.Map(variable[property], name, path);
+          path.pop();
         }
       }
     }
@@ -263,12 +268,13 @@ var Syc = {
     Syc.Map_Object(variable);
   },
 
-  Per_Variable: function (variable, id) { 
-    if (id in Syc.visited) { 
-      if (syc.visited[id]) return false;
-      else Syc.visited[id] = true;
+  Per_Object: function (variable, id, name, path) { 
+    if (syc.visited[id]) {
+      Syc.object_paths[name][id].push(path.slice(0));
+      return false;
     } else {
-      throw "Sanity check: id " + id + " not given a mark for garbage collection." 
+      Syc.visited[id] = true;
+      Syc.object_paths[name][id] = [path.slice(0)];
     }
 
     var map = Syc.object_map[id];
@@ -332,6 +338,49 @@ var Syc = {
     }
 
     Syc.Observed([changes]);
+  },
+
+  Path: function (target_id, variable_name) {
+    var origin = Syc.objects[Syc.variables[variable_name]],
+        paths = Syc.object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
+
+    for (path_number in paths) { 
+      var path = paths[path_number];
+      
+      var hidden = Hidden_Paths(path, origin, variable_name);
+      if (hidden.length > 0) { 
+        paths.push(hidden);
+      }
+    }
+
+    return paths;
+
+
+    function Hidden_Paths(path, object, variable_name, index) { 
+      /* This fat function is necessitated by Traversals not traversing
+      down through objects that have been visited already, failing to record 
+      all possible paths to the target. */
+
+      var id = object['syc-object-id'],
+          paths = Syc.object_paths[variable_name][id];
+          index = index || 0,
+          next = object[path[index]],
+          new_paths = [];
+
+      if (paths.length > 0) { 
+
+        for (var i=1; i<paths.length; i++) { 
+          var new_path = paths[i].concat(path.slice(index));
+          new_paths.push(new_path);
+        }
+      }
+
+      if (index < path.length-1) { 
+        return new_paths.concat(Hidden_Paths(path, next, variable_name, index+1));
+      } else {
+        return new_paths;
+      }
+    }
   }
 }
 

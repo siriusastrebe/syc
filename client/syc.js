@@ -23,8 +23,12 @@ var Syc = {
 
   List: function (argument) { return Syc.list(argument) },
 
+  watch: function (variable_name, func) { Syc.Watch(variable_name, func) },
+
   variables: {},
   objects: {},
+
+  watchers: {},
 
   observe_lock: {},
   object_map: {},
@@ -58,6 +62,8 @@ var Syc = {
 
     if (Syc.observable) Syc.observe_lock[id] = true;
 
+    var old_value = variable[property];
+
     if (type === 'add' || type === 'update') { 
       variable[property] = Syc.Resolve(changes)
     } else if (type === 'delete') { 
@@ -66,9 +72,9 @@ var Syc = {
       throw 'Received changes for an unknown change type: ' + type;
     }
 
+    Syc.Awake_Watchers(variable, property, type, old_value);
+
     Syc.Map_Object(variable);
- 
-    function Resolve (changes) { 
   },
 
   Resolve: function (changes) { 
@@ -205,6 +211,30 @@ var Syc = {
     return id;
   },
 
+
+  // ---- ---- ---- ----  Watchers  ---- ---- ---- ---- 
+  Watch: function (variable_name, func) { 
+    if (variable_name in Syc.watchers) {
+      Syc.watchers[variable_name].push(func);
+    } else { 
+      Syc.watchers[variable_name] = [func];
+    }
+  },
+
+  Awake_Watchers: function (variable, property, type, old_value) { 
+    var id = variable['syc-object-id'];
+
+    // TODO: This only accounts for the first variable to traverse onto this object
+    for (variable in Syc.watchers) { 
+      if (variable in Syc.object_paths) { 
+        if (id in Syc.object_paths[variable]) { 
+          Syc.watchers[variable].forEach( function (watcher) { 
+            watcher(variable, property, type, old_value, Syc.Path(id, variable));
+          });
+        }
+      }
+    }
+  },
   
   // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
   // ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 

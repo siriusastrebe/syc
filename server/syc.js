@@ -116,7 +116,7 @@ function Observed (changes) {
 
     changes = Describe(changed, object, property);
 
-    Awaken_Watchers(object, property, type, old_value);
+//    Awaken_Watchers(object, property, type, old_value);
 
     Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
@@ -131,6 +131,7 @@ function Standardize_Change_Type (type) {
   return type;
 }
 
+/*
 // This function is the mushu of functions. It awakens all the ancestors
 // so that the watcher may be roused.
 function Awaken_Watchers (object, property, type, old_value) { 
@@ -196,7 +197,7 @@ function Awaken_Watchers (object, property, type, old_value) {
           console.log('\n\n\n', path, '\n\n', property, '\n\n', route_table[id], '\n\n', object, '\n\n', e)
         }
         throw 'hahaha'
-      } */
+      } 
       paths = paths.concat(results);
 
       path.pop(property);
@@ -206,6 +207,7 @@ function Awaken_Watchers (object, property, type, old_value) {
   }
 }
 
+*/
 
 /*
 function Awaken_Watchers (object) { 

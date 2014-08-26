@@ -77,12 +77,13 @@ setInterval(function() {
 */
 
 
-/*
-
 // Test Derek: persistent, massive scale test for complex path structures
+/*
 syc.watch('YO', function (object, property, paths, type, old_value) { 
   console.log(object[property], paths, type, old_value);
 });
+*/
+
 
 frank = v[i];
 bob = v[i];
@@ -97,7 +98,7 @@ setInterval(function () {
   } 
 
   frank = frank[rand];
-}, 500);
+}, 5000);
 
 function random_word () { 
   english = "The mental features discoursed of as the analytical, are, in themselves, but little susceptible of analysis. We appreciate them only in their effects. We know of them, among other things, that they are always to their possessor, when inordinately possessed, a source of the liveliest enjoyment. As the strong man exults in his physical ability, delighting in such exercises as call his muscles into action, so glories the analyst in that moral activity which disentangles. He derives pleasure from even the most trivial occupations bringing his talents into play. He is fond of enigmas, of conundrums, of hieroglyphics; exhibiting in his solutions of each a degree of acumen which appears to the ordinary apprehension preternatural. His results, brought about by the very soul and essence of method, have, in truth, the whole air of intuition. The Canadian paused in his work. But one word twenty times repeated, one dreadful word, told me the reason for the agitation spreading aboard the Nautilus. We weren't the cause of the crew's concern.  Maelstrom! Maelstrom! they were shouting.  The Maelstrom! Could a more frightening name have rung in our ears under more frightening circumstances? Were we lying in the dangerous waterways off the Norwegian coast? Was the Nautilus being dragged into this whirlpool just as the skiff was about to detach from its plating?";
@@ -105,7 +106,6 @@ function random_word () {
   split = english.split(' ');
   return split[Math.floor(Math.random() * (split.length))]
 }
-*/
 
 // Test Emma: Basic test to confirm separation of one-way and two-way structures. It should error.
 /*
@@ -113,11 +113,13 @@ v[i] = z;
 */
 
 // Test Frank: One-way variable integrity test
+/*
 z['Greek'] = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega']
 z['Phonecian'] = ['Aleph', 'Beth', 'Gimel', 'Daleth', 'He', 'Waw', 'Zayin', 'Heth', 'Teth', 'Yodh', 'Kaph', 'Lamedh', 'Mem', 'Nun', 'Samekh', '\'ayin', 'Pe', 'Sade', 'Qoph', 'Res', 'Sin', 'Taw', 'Waw']
 z[0] = z['Greek'][0];
 z[1] = z['Greek'][1];
 z[2] = {a: {b: {c: {d: ['e', 'f', 'g']}}}};
+*/
 
 
 

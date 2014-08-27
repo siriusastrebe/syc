@@ -1,10 +1,13 @@
 var connected = [];
 var observe_lock = {};
 var object_map = {};
-var mapping_timer;
 var observable = !!Object.observe;
 var object_paths = {};
 var watchers = {};
+var buffers = [];
+
+var mapping_timer;
+var send_timer;
 
 Syc = {
   connect: function (socket) { 
@@ -71,6 +74,36 @@ function Broadcast (title, data, sender) {
   audience.forEach( function (socket) { 
     socket.emit(title, data);
   });
+}
+
+function Buffer (title, data, audience) { 
+  buffers.push({title: title; data: data, audience: audience});
+
+  if ( !(send_timer) ) { 
+    send_timer = setTimeout(
+   
+      function () {
+        var sockets = {};
+
+        buffers.forEach( function (message) { 
+          message.audience.forEach (function (member) { 
+            var id = member.socket.sessionid;
+            
+            if (sockets[id]) sockets[id].push(message);
+            else sockets[id] = [socket, message];
+          });
+        });
+
+        for (id in sockets) {
+          // TODO: This is kinda a hilarious hack...
+          sockets[id][0].emit(sockets[id].splice(1));
+        }
+
+        buffers = {};
+        send_timer = false;
+      }, 20
+    )
+  }
 }
 
 

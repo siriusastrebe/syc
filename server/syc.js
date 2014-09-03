@@ -37,7 +37,9 @@ Syc = {
   },
 
   variables: {},
-  objects: {}
+  objects: {},
+
+  buffer_delay: 20
 }
 
                 
@@ -61,9 +63,7 @@ function InvalidTypeError (type) {
 function Emit (title, data, sockets) { 
   var audience = sockets || connected;
 
-  audience.forEach( function (socket) { 
-    socket.emit(title, data);
-  });
+  Buffer(title, data, audience)
 }
 
 function Broadcast (title, data, sender) { 
@@ -71,13 +71,11 @@ function Broadcast (title, data, sender) {
 
   audience.splice(audience.indexOf(sender), 1);
 
-  audience.forEach( function (socket) { 
-    socket.emit(title, data);
-  });
+  Buffer(title, data, audience);
 }
 
 function Buffer (title, data, audience) { 
-  buffers.push({title: title; data: data, audience: audience});
+  buffers.push({title: title, data: data, audience: audience});
 
   if ( !(send_timer) ) { 
     send_timer = setTimeout(
@@ -85,23 +83,29 @@ function Buffer (title, data, audience) {
       function () {
         var sockets = {};
 
+        console.log(buffers);
+
         buffers.forEach( function (message) { 
           message.audience.forEach (function (member) { 
-            var id = member.socket.sessionid;
+            var id = member.sessionid;
             
-            if (sockets[id]) sockets[id].push(message);
-            else sockets[id] = [socket, message];
+            if (sockets[id]) sockets[id].push([message.title, message.data]);
+            else sockets[id] = [member, [message.title, message.data]];
           });
         });
 
         for (id in sockets) {
           // TODO: This is kinda a hilarious hack...
-          sockets[id][0].emit(sockets[id].splice(1));
+          var socket = sockets[id][0];
+          var messages = sockets[id].splice(1);
+
+          socket.emit('syc-messages', messages);
         }
 
-        buffers = {};
+        buffers = [];
         send_timer = false;
-      }, 20
+      }, Syc.buffer_delay
+
     )
   }
 }
@@ -378,8 +382,6 @@ function Receive_Change (data, socket) {
       changes   = data.changes;
 
   var variable = Syc.objects[id];
-
-  console.log(data);
 
   if (variable['syc-one-way'] === true) { 
     console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');

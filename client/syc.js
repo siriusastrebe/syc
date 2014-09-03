@@ -4,6 +4,7 @@ var Syc = {
 
     socket.on('syc-object-change', Syc.Receive_Change);
     socket.on('syc-variable-new', Syc.New_Variable);
+    socket.on('syc-messages', Syc.Receive_Message);
 
     if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, 600);
   },
@@ -38,6 +39,24 @@ var Syc = {
 
   /* ---- ---- ---- ----  New Variables  ---- ---- ---- ---- */
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
+  Receive_Message: function (messages) { 
+    messages.forEach( function (message) { 
+      console.log(message);
+
+      var title = message[0],
+          data = message[1];
+
+      if (title === 'syc-object-change') {
+        Syc.Receive_Change(data);
+      } else if (title === 'syc-variable-new') { 
+        Syc.New_Variable(data);
+      } else { 
+        console.error("Syc error: Received a message title " + title + " which is not recognized");
+      }
+    });
+  },
+
+
   New_Variable: function (data) { 
     var name = data.name,
         id = data.id,
@@ -58,7 +77,7 @@ var Syc = {
     var variable = Syc.objects[id];
 
     if (variable === undefined)
-      throw "Out of sync error: received changes to an unknown object: " + id;
+      console.error("Syc error: Out of sync error: received changes to an unknown object: " + id)
 
     if (Syc.observable) Syc.observe_lock[id] = true;
 
@@ -69,7 +88,7 @@ var Syc = {
     } else if (type === 'delete') { 
       delete variable[property];
     } else { 
-      throw 'Received changes for an unknown change type: ' + type;
+      console.error('Syc error: Received changes for an unknown change type: ' + type);
     }
 
     Syc.Awake_Watchers(variable, property, type, old_value);
@@ -374,6 +393,9 @@ var Syc = {
 
 
   Path: function (target_id, variable_name) {
+    // TODO: This is highly inefficient to call Traverse every time
+    Syc.Traverse();
+
     var origin = Syc.objects[Syc.variables[variable_name]],
         paths = Syc.object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
 

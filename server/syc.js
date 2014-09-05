@@ -23,18 +23,12 @@ Syc = {
     Name(name, this);
   },
 
-  serve: function (name) { 
+  serve: function (name) {
     Verify(this, 'serve');
     Name(name, this, true);
   },
 
-  watch: function (variable_name, func) { 
-    if (!(variable_name in watchers)) {
-      throw "No syc variable by the name " + variable_name;
-    }
- 
-    watchers[variable_name].push(func);
-  },
+  watch: function (variable_name, func) { Watch(variable_name, func) },
 
   variables: {},
   objects: {},
@@ -164,8 +158,6 @@ function Observed (changes) {
 
     changes = Describe(changed, object, property);
 
-//    Awaken_Watchers(object, property, type, old_value);
-
     Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
 }
@@ -179,113 +171,6 @@ function Standardize_Change_Type (type) {
   return type;
 }
 
-/*
-// This function is the mushu of functions. It awakens all the ancestors
-// so that the watcher may be roused.
-function Awaken_Watchers (object, property, type, old_value) { 
-  var ancestors = Awaken_Ancestors(object),
-      id = object['syc-object-id'];
-
-  for (name in watchers) { 
-    var watcher_id = Syc.variables[name];
-    if (watcher_id in ancestors) { 
-      var watcher = Syc.objects[watcher_id];
-
-      var paths = Compile_Paths(watcher, ancestors, id); 
-      
-      watchers[name].forEach( function (trigger) { 
-        trigger(object, property, paths, type, old_value);
-      });
-    }
-  }
-
-  function Awaken_Ancestors (object, property, visited, old_value) { 
-    var parents = object['syc-path-names'],
-        id = object['syc-object-id'],
-        property = property || {}
-        visited = visited || {};
-
-    if (id in visited) {
-      visited[id].push(property);
-      return;
-    } else {  
-      visited[id] = [property];
-    }
-
-    for (parent_id in parents) { 
-      var paths = parents[parent_id];
-  
-      paths.forEach( function (path) { 
-        return Awaken_Ancestors(Syc.objects[parent_id], path, visited);
-      });
-    }
-  
-    return visited;
-  }
-
-  function Compile_Paths (object, route_table, destination, path) { 
-    var id = object['syc-object-id'],
-        path = path || [],
-        paths = [];
-        
-    if (id === destination) { 
-      return [path.slice(0)];
-    }
-  
-    route_table[id].forEach( function (property) { 
-      path.push(property);
-
-//      console.log(id, property);
-//      try { 
-      var results = Compile_Paths(object[property], route_table, destination, path);
-/*      } catch (e) { 
-        if (e !== 'hahaha') { 
-          var props = []
-          for (p  in object) { props.push(p) }
-          console.log('\n\n\n', path, '\n\n', property, '\n\n', route_table[id], '\n\n', object, '\n\n', e)
-        }
-        throw 'hahaha'
-      } 
-      paths = paths.concat(results);
-
-      path.pop(property);
-    });
-
-    return paths;
-  }
-}
-
-*/
-
-/*
-function Awaken_Watchers (object) { 
-  var watches = Check_Watchers(object);
-}
-
-function Check_Watchers (object, path, triggers, visited) {
-  var path = path || [],
-      triggers = triggers || {},
-      visited = visited || [],
-      object_id = object['syc-object-id'],
-      variable_name = object['syc-variable-name'],
-      parents = object['syc-path-names'];
-
-  if (object_id in visited) { return }
-  else { visited.push(object_id) }
-
-  if (variable_name === undefined) { 
-    // this'll be where a deep-observe verification will occur
-
-    for (id in parents) {
-      path.push(parents[id][0]);
-      triggers = Check_Watchers(Syc.objects[id], path, triggers, visited);
-      path.pop()
-    }
-  } else {
-    return triggers[variable_name] = watchers[variable_name];
-  } 
-}
-*/
 
 /* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
 function Describe (variable, parent, pathname) { 
@@ -390,7 +275,7 @@ function Receive_Change (data, socket) {
   var type     = data.type,
       id       = data.id,
       property = data.property
-      changes   = data.changes;
+      changes  = data.changes;
 
   var variable = Syc.objects[id];
 
@@ -399,6 +284,7 @@ function Receive_Change (data, socket) {
     Reset(socket);
   }
 
+  var old_value = variable[property];
 
   if (variable === undefined)
     console.warn("Received changes to an unknown object: " + id);
@@ -412,6 +298,8 @@ function Receive_Change (data, socket) {
   } else { 
     console.warn('Syc warning: Recieved changes for an unknown change type: ' + type);
   }
+
+  Awake_Watchers(variable, property, type, old_value);
 
   Map_Object(variable);
 
@@ -519,6 +407,78 @@ function Reset (socket) {
         variable = Syc.objects[id];
 
     Emit('syc-variable-new', {name: name, id: id, description: Describe_Recursive(variable)}, [socket]);
+  }
+}
+
+
+// ---- ---- ---- ----  Watchers  ---- ---- ---- ----
+function Watch (variable_name, func) { 
+  if (variable_name in watchers) {
+    watchers[variable_name].push(func);
+  } else { 
+    watchers[variable_name] = [func];
+  }
+}
+
+function Awake_Watchers (variable, property, type, old_value) { 
+  var id = variable['syc-object-id'];
+
+  // TODO: This only accounts for the first variable to traverse onto this object
+  for (variable in watchers) { 
+    if (variable in object_paths) { 
+      if (id in object_paths[variable]) { 
+        watchers[variable].forEach( function (watcher) { 
+          watcher(variable, property, type, old_value, Path(id, variable));
+        });
+      }
+    }
+  }
+}
+
+
+function Path (target_id, variable_name) {
+  // TODO: We can be more efficient than calling Traverse on each watcher
+  Traverse();
+
+  var origin = Syc.objects[Syc.variables[variable_name]],
+      paths = object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
+
+  for (path_number in paths) { 
+    var path = paths[path_number];
+    
+    var hidden = Hidden_Paths(path, origin, variable_name);
+    if (hidden.length > 0) { 
+      paths.push(hidden);
+    }
+  }
+
+  return paths;
+
+
+  function Hidden_Paths(path, object, variable_name, index) { 
+    /* This fat function is necessitated by Traversals not traversing
+    down through objects that have been visited already, failing to record 
+    all possible paths to the target. */
+
+    var id = object['syc-object-id'],
+        paths = object_paths[variable_name][id];
+        index = index || 0,
+        next = object[path[index]],
+        new_paths = [];
+
+    if (paths.length > 0) { 
+
+      for (var i=1; i<paths.length; i++) { 
+        var new_path = paths[i].concat(path.slice(index));
+        new_paths.push(new_path);
+      }
+    }
+
+    if (index < path.length-1) { 
+      return new_paths.concat(Hidden_Paths(path, next, variable_name, index+1));
+    } else {
+      return new_paths;
+    }
   }
 }
 
@@ -657,57 +617,6 @@ function Observer (name, object, type, old_value) {
 }
 
 
-/*
-function Object_Path_via_variable (target_id, variable_name) {
-  var origin_id = Syc.list(variable_name);
-  return Path(target_id, origin_id);
-}
-*/
-
-
-
-function Path (target_id, variable_name) {
-  var origin = Syc.objects[Syc.variables[variable_name]],
-      paths = object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
-
-  for (path_number in paths) { 
-    var path = paths[path_number];
-    
-    var hidden = Hidden_Paths(path, origin, variable_name);
-    if (hidden.length > 0) { 
-      paths.push(hidden);
-    }
-  }
-
-  return paths;
-
-
-  function Hidden_Paths(path, object, variable_name, index) { 
-    /* This fat function is necessitated by Traversals not traversing
-    down through objects that have been visited already, failing to record 
-    all possible paths to the target. */
-
-    var id = object['syc-object-id'],
-        paths = object_paths[variable_name][id];
-        index = index || 0,
-        next = object[path[index]],
-        new_paths = [];
-
-    if (paths.length > 0) { 
-
-      for (var i=1; i<paths.length; i++) { 
-        var new_path = paths[i].concat(path.slice(index));
-        new_paths.push(new_path);
-      }
-    }
-
-    if (index < path.length-1) { 
-      return new_paths.concat(Hidden_Paths(path, next, variable_name, index+1));
-    } else {
-      return new_paths;
-    }
-  }
-}
 
 
 

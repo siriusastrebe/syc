@@ -49,7 +49,7 @@ var i = 0;
 
 v[i] = {}
 
-/*
+
 // Test Aaron: Basic test for ensuring data passing
 v[i++] = [[1, 2,], [3, 4]];
 v[i++] = {};
@@ -61,7 +61,6 @@ v[i][1].push(v[i][0][0]);
 i++;
 
 
-*/
 
 
 
@@ -85,6 +84,7 @@ syc.watch('YO', function (object, property, paths, type, old_value) {
 */
 
 
+/*
 frank = v[i];
 bob = v[i];
 
@@ -106,6 +106,7 @@ function random_word () {
   split = english.split(' ');
   return split[Math.floor(Math.random() * (split.length))]
 }
+*/
 
 // Test Emma: Basic test to confirm separation of one-way and two-way structures. It should error.
 /*

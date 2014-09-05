@@ -67,9 +67,16 @@ function Emit (title, data, sockets) {
 }
 
 function Broadcast (title, data, sender) { 
-  var audience = connected.slice(0); // create a clone so we don't tamper the original
+  console.log(data);
+  var audience = connected.slice(0), // create a clone so we don't tamper the original
+      index = audience.indexOf(sender);
 
-  audience.splice(audience.indexOf(sender), 1);
+  if (index !== -1) { 
+    audience.splice(index, 1);
+  }
+
+  console.log(audience.length);
+  console.log(audience.map(function (a) {return a.id}))
 
   Buffer(title, data, audience);
 }
@@ -83,11 +90,9 @@ function Buffer (title, data, audience) {
       function () {
         var sockets = {};
 
-        console.log(buffers);
-
         buffers.forEach( function (message) { 
           message.audience.forEach (function (member) { 
-            var id = member.sessionid;
+            var id = member.id;
             
             if (sockets[id]) sockets[id].push([message.title, message.data]);
             else sockets[id] = [member, [message.title, message.data]];
@@ -98,6 +103,12 @@ function Buffer (title, data, audience) {
           // TODO: This is kinda a hilarious hack...
           var socket = sockets[id][0];
           var messages = sockets[id].splice(1);
+
+          if (socket.disconnected) {
+            var index = connected.indexOf(socket);
+            if (index !== -1) connected.splice(index, 1);
+            continue;
+          }
 
           socket.emit('syc-messages', messages);
         }

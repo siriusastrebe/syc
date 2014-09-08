@@ -6,7 +6,7 @@ var Syc = {
     socket.on('syc-variable-new', Syc.New_Variable);
     socket.on('syc-messages', Syc.Receive_Message);
 
-    if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, 600);
+    if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, Syc.polyfill_interval);
   },
 
   list: function (name) {
@@ -28,6 +28,8 @@ var Syc = {
 
   variables: {},
   objects: {},
+
+  polyfill_interval: 200,
 
   watchers: {},
 
@@ -313,9 +315,9 @@ var Syc = {
             path.pop();
           }
         }
-      }
 
-      Syc.Map_Object(variable);
+        Syc.Map_Object(variable);
+      }
     }
 
     function Per_Object (variable, id, name, path) { 

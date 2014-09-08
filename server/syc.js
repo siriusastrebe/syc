@@ -15,7 +15,7 @@ Syc = {
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
     Reset(socket);
     
-    if (!mapping_timer) mapping_timer = setInterval(Traverse, 600);
+    if (!mapping_timer) mapping_timer = setInterval(Traverse, Syc.polyfill_interval);
   },
   
   sync: function (name) {
@@ -33,6 +33,7 @@ Syc = {
   variables: {},
   objects: {},
 
+  polyfill_interval: 200,
   buffer_delay: 20
 }
 
@@ -347,7 +348,7 @@ function Apply_Changes (changes) {
 
 // ---- ---- ---- ----  Object Conversion  ----- ---- ---- ---- 
 function Meta (variable, one_way,  id) {
-  if (variable['syc-object-id']) { throw "Already Existing object" };
+  if (variable['syc-object-id']) { console.error("Already Existing object") };
 
   var id = id || token();
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
@@ -437,8 +438,7 @@ function Awake_Watchers (variable, property, type, old_value) {
 
 
 function Path (target_id, variable_name) {
-  // TODO: We can be more efficient than calling Traverse on each watcher
-  Traverse();
+  // TODO: This function is dependent on Traverse() having been called to update object_paths.
 
   var origin = Syc.objects[Syc.variables[variable_name]],
       paths = object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
@@ -525,7 +525,7 @@ function Traverse () {
 function Map (variable, name, path) {
   var id = variable['syc-object-id'];
 
-  if (id === undefined) throw 'Syc Sanity Check: polyfill cannot determine object id';
+  if (id === undefined) console.error('Syc Sanity Check: polyfill cannot determine object id');
   if (path === undefined) { var path = [] }
 
   var proceed = Per_Object(variable, id, name, path);
@@ -540,18 +540,18 @@ function Map (variable, name, path) {
         path.pop();
       }
     }
-  }
 
-  Map_Object(variable);
+    Map_Object(variable);
+  }
 }
 
 function Per_Object (variable, id, name, path) { 
-  if (!visited[id]) { 
-    visited[id] = true;
-    object_paths[name][id] = [path.slice(0)];
-  } else { 
+  if (visited[id]) { 
     object_paths[name][id].push(path.slice(0));
     return false;
+  } else { 
+    visited[id] = true;
+    object_paths[name][id] = [path.slice(0)];
   }
 
   var map = object_map[id];
@@ -571,8 +571,6 @@ function Per_Property (variable, name, variable_id) {
       value = Evaluate(type, property);
 
   var map = object_map[variable_id][name];
-
-//  console.log(map, name, type, value, variable_id);
 
   if (map === undefined) {
     Observer(name, variable, 'add');

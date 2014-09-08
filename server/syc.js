@@ -299,9 +299,9 @@ function Receive_Change (data, socket) {
     console.warn('Syc warning: Recieved changes for an unknown change type: ' + type);
   }
 
-  Awake_Watchers(variable, property, type, old_value);
-
   Map_Object(variable);
+
+  Awake_Watchers(variable, property, type, old_value);
 
   Broadcast('syc-object-change', data, socket);
 }

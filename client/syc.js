@@ -91,9 +91,9 @@ var Syc = {
       console.error('Syc error: Received changes for an unknown change type: ' + type);
     }
 
-    Syc.Awake_Watchers(variable, property, type, old_value);
-
     Syc.Map_Object(variable);
+
+    Syc.Awake_Watchers(variable, property, type, old_value);
   },
 
   Resolve: function (changes) { 
@@ -393,8 +393,7 @@ var Syc = {
 
 
   Path: function (target_id, variable_name) {
-    // TODO: This is highly inefficient to call Traverse every time
-    Syc.Traverse();
+    // TODO: This function is dependent on Traverse() having been called to update object_paths.
 
     var origin = Syc.objects[Syc.variables[variable_name]],
         paths = Syc.object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.

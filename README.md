@@ -86,7 +86,7 @@ At this point alertMe will be called, and you will see
 
 `type` is the change type that happened, and can be one of `add`, `delete`, or `update`.
 
-`paths` is a 2 dimensional list. Each inner list is a full path from the root of the variable, to the object where the change occurred.
+`paths` is a 2 dimensional list. Each inner list is a full path from the root of the variable, to the object where the change occurred (cycles are only counted once).
 
     syc.watch('name', function (object, property, type, paths, old_value) { console.log(paths) })
     synced.ascending[4] = 5;

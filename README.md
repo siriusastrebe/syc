@@ -66,13 +66,15 @@ Serving a variable restricts the client from making any changes to data bound to
 
 ## Watchers (Client and Server Side)
 
+Occasionally, you'll want to be notified when a remote source changes your variable.
+
     function alertMe (object, property, type, paths, old_value) {
         alert(object, property, type, paths, old_value);
     }
     
-    syc.watch('synced', function)
+    syc.watch('name', function)
 
-This will pop up an alert every time an object bound to the variable 'synced' is modified.
+This will pop up an alert every time you receive a remote change to an object bound to the variable 'name'.
 
     synced.ascending = [1, 2, 3, 4]
 
@@ -86,7 +88,7 @@ At this point alertMe will be called, and you will see
 
 `paths` is a 2 dimensional list. Each inner list is a full path from the root of the variable, to the object where the change occurred.
 
-    syc.watch('synced', function (object, property, type, paths, old_value) { console.log(paths) })
+    syc.watch('name', function (object, property, type, paths, old_value) { console.log(paths) })
     synced.ascending[4] = 5;
     -> [['ascending', '4']]
 
@@ -94,6 +96,6 @@ At this point alertMe will be called, and you will see
 - - - 
 This library is a work in progress.
 
-Planned features: Verifiers, Synchronization/Integrity checks, Converting an existing variable to a Syc variable.
+Planned features: Verifiers, Observers, Synchronization/Integrity checks, Converting an existing variable to a Syc variable.
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!

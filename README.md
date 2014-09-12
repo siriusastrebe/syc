@@ -1,7 +1,7 @@
 Syc
 ===
 
-Wouldn't it be nice if you could change a variable on your node.js server, and see that same change reflected on your client's browsers?
+Wouldn't it be nice if you could change a variable on your node.js server, and see that same change reflected on your clients' browsers?
 
 When you create a Syc variable, an identical variable will appear on the client side. Any changes to this variable will be communicated via socket.io instantaneously and will see those same changes on the client. Clients can modify the variable and have it reflected on the server side. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
 

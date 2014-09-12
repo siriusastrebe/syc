@@ -3,7 +3,7 @@ Syc
 
 Wouldn't it be nice if you could change a variable on your node.js server, and see that same change reflected on your clients' browsers?
 
-When you create a Syc variable, an identical variable will appear on the client side. Any changes to this variable will be communicated via socket.io instantaneously and will see those same changes on the client. Clients can modify the variable and have it reflected on the server side. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
+When you create a Syc variable, an identical variable will appear on the client side. Changes to this variable will be communicated and updated via socket.io instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
 
 Like Meteor, but without the framework.
 

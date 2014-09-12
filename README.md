@@ -66,8 +66,8 @@ Serving a variable restricts the client from making any changes to data bound to
 
 ## Watchers (Client and Server Side)
 
-    function alertMe (object, property, paths, type, old_value) {
-        alert(object[property]);
+    function alertMe (object, property, type, paths, old_value) {
+        alert(object, property, type, paths, old_value);
     }
     
     syc.watch('synced', function)
@@ -76,34 +76,24 @@ This will pop up an alert every time an object bound to the variable 'synced' is
 
     synced.ascending = [1, 2, 3, 4]
 
-At this point alertMe will be called, and you will see an alert listing 1,2,3,4.
+At this point alertMe will be called, and you will see
 
-`type` is the change type for the object, and can take the values `add`, `delete`, or `update`.
+    -> [Object], 'ascending', 'add', [[]], undefined 
 
-`paths` is a list of paths to the object that has been modified from the root of the object structure. For example, if you were to modify the newly created property `ascending` as such:
+`object[property]` will get you the specific change. 
 
-    synced.ascending[4] = {value: 'five'}
+`type` is the change type that happened, and can be one of `add`, `delete`, or `update`.
 
-then alertMe would be called with the argument `property` set to `4` and `paths` being set to `[['ascending']]`, meaning you can access the modified value via `synced['ascending'][4]`. Multiple paths to the same object will be listed, but loops and circular references are ignored.
+`paths` is a 2 dimensional list. Each inner list is a full path from the root of the variable, to the object where the change occurred.
 
-
-## Verifiers
-    
-    function Verify (object, callback);
-    function Verify_Complex (name, complex_callback);
-    
-    functionc callback (change, object, property, type, current_value) {
-      return change;
-    }
-    
-    function complex_callback (change, object, property, type, current_value, path) {
-      
-    }
+    syc.watch('synced', function (object, property, type, paths, old_value) { console.log(paths) })
+    synced.ascending[4] = 5;
+    -> [['ascending', '4']]
 
 
 - - - 
 This library is a work in progress, don't mind the extra files lying around. All you need is server/syc.js and client/syc.js.
 
-Planned features: Server -> Client one way synchronization, watchers, and verifiers.
+Planned features: Verifiers, Synchronization/Integrity checks
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!

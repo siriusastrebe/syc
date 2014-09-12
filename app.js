@@ -49,6 +49,8 @@ var i = 0;
 
 v[i] = {}
 
+syc.watch('YO', function (a,b,c,d,e,f) { console.log(' - - - - ', a,b,c,d,e,f); });
+
 
 // Test Aaron: Basic test for ensuring data passing
 /*
@@ -62,7 +64,6 @@ v[i][1].push(v[i][0][0]);
 i++;
 
 
-syc.watch('YO', function (a,b,c,d,e,f) { console.log(' - - - - ', a,b,c,d,e,f); });
 
 */
 

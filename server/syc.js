@@ -62,16 +62,12 @@ function Emit (title, data, sockets) {
 }
 
 function Broadcast (title, data, sender) { 
-  console.log(data);
   var audience = connected.slice(0), // create a clone so we don't tamper the original
       index = audience.indexOf(sender);
 
   if (index !== -1) { 
     audience.splice(index, 1);
   }
-
-  console.log(audience.length);
-  console.log(audience.map(function (a) {return a.id}))
 
   Buffer(title, data, audience);
 }
@@ -302,7 +298,7 @@ function Receive_Change (data, socket) {
 
   Map_Object(variable);
 
-  Awake_Watchers(variable, property, type, old_value);
+  Awake_Watchers(variable, property, type, old_value, socket);
 
   Broadcast('syc-object-change', data, socket);
 }
@@ -421,7 +417,7 @@ function Watch (variable_name, func) {
   }
 }
 
-function Awake_Watchers (variable, property, type, old_value) { 
+function Awake_Watchers (variable, property, type, old_value, socket) { 
   var id = variable['syc-object-id'];
 
   // TODO: This only accounts for the first variable to traverse onto this object
@@ -429,7 +425,7 @@ function Awake_Watchers (variable, property, type, old_value) {
     if (variable in object_paths) { 
       if (id in object_paths[variable]) { 
         watchers[variable].forEach( function (watcher) { 
-          watcher(variable, property, type, old_value, Path(id, variable));
+          watcher(variable, property, type, old_value, Path(id, variable), socket);
         });
       }
     }

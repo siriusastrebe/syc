@@ -92,6 +92,7 @@ At this point alertMe will be called, and you will see
     synced.ascending[4] = 5;
     -> [['ascending', '4']]
 
+*Note* Server side watchers have access to the originating socket `function (object, property, type, paths, old_value, socket)`
 
 - - - 
 This library is a work in progress.

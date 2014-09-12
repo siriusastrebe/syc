@@ -1,13 +1,13 @@
 Syc
 ===
 
-If you're using Javascript on both the server and client, why worry about message passing from server to client?
+Wouldn't it be nice if you could change a variable on your node.js server, and see that same change reflected on your client?
 
-Syc syncs a variable from server to client. When you create a Syc variable, an identical variable will appear on the client side. Any changes to this variable will be communicated via socket.io instantaneously and will see those same changes on the client. Clients can modify the variable and have it reflected on the server side. It works under a simple principle: All data bound to the variable in question is identical between Server and Client.
+When you create a Syc variable, an identical variable will appear on the client side. Any changes to this variable will be communicated via socket.io instantaneously and will see those same changes on the client. Clients can modify the variable and have it reflected on the server side. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
 
 Like Meteor, but without the framework.
 
-Syc uses Object.observe if it's available for incredible responsiveness and performance, but will easily fall back onto a polyfill for older clients, or when you need to run Node without the --harmony flag.
+Syc uses Object.observe if it's available for incredible responsiveness and performance, but will easily fall back onto a polyfill for older clients or Node instances without --harmony.
 
 ## Syncing a variable (Server side)
 
@@ -92,8 +92,8 @@ At this point alertMe will be called, and you will see
 
 
 - - - 
-This library is a work in progress, don't mind the extra files lying around. All you need is server/syc.js and client/syc.js.
+This library is a work in progress.
 
-Planned features: Verifiers, Synchronization/Integrity checks
+Planned features: Verifiers, Synchronization/Integrity checks, Converting an existing variable to a Syc variable.
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!

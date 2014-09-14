@@ -166,7 +166,7 @@ var Syc = {
         else { delete object[property] }
         console.error("Syc error: Cannot make changes to a one-way variable.");
         return;
-      } 
+      }
 
       var changes = Syc.Describe(changed, object, property);
 

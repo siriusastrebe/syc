@@ -4,6 +4,7 @@ var object_map = {};
 var observable = !!Object.observe;
 var object_paths = {};
 var watchers = {};
+var verifiers = {};
 var buffers = [];
 
 var mapping_timer;
@@ -12,28 +13,35 @@ var send_timer;
 Syc = {
   connect: function (socket) { 
     connected.push(socket);
+
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
+    socket.on('syc-reset-request', function (data) { Reset(socket) }) 
+
     Reset(socket);
     
-    if (!mapping_timer) mapping_timer = setInterval(Traverse, Syc.polyfill_interval);
+    if (!mapping_timer) mapping_timer = setInterval(Traverse, (Syc.polyfill_interval > Syc.integrity_interval) ? Syc.integrity_interval : Syc.polyfill_interval);
   },
   
   sync: function (name) {
-    Verify(this, 'sync');
+    Namespace(this, 'sync');
     Name(name, this);
   },
 
   serve: function (name) {
-    Verify(this, 'serve');
+    Namespace(this, 'serve');
     Name(name, this, true);
   },
 
   watch: function (variable_name, func) { Watch(variable_name, func) },
+  verify: function (variable_name, func) { Verify(variable_name, func) },
+
+  type: Type,
 
   variables: {},
   objects: {},
 
   polyfill_interval: 200,
+  integrity_interval: 12000,
   buffer_delay: 20
 }
 
@@ -113,7 +121,7 @@ function Buffer (title, data, audience) {
 }
 
 
-function Verify (variable, kind) { 
+function Namespace (variable, kind) { 
   if ( !(variable instanceof Syc.sync) && !(variable instanceof Syc.serve) ) {
     throw "Improper use of Syc." + kind + "(). Try: 'new Syc." + kind + "()'";
   }
@@ -289,11 +297,22 @@ function Receive_Change (data, socket) {
   if (observable) observe_lock[id] = true;
 
   if (type === 'add' || type === 'update') { 
-    variable[property] = Apply_Changes(changes);
-  } else if (type === 'delete') { 
-    delete variable[property];
-  } else { 
-    console.warn('Syc warning: Recieved changes for an unknown change type: ' + type);
+    var simulated = Apply_Changes(changes, type);
+    var verified = Awake_Verifier(simulated, variable, property, type, old_value, socket);
+
+    if (verified !== undefined) { 
+      variable[property] = verified;
+    } else { 
+      return
+    }
+  } else if (type === 'delete') {
+    var verified = Awake_Verifier(true, variable, property, type, old_value, socket);
+    
+    if (verified !== false) { 
+      delete variable[property];
+    } else { 
+      return;
+    }
   }
 
   Map_Object(variable);
@@ -417,7 +436,27 @@ function Watch (variable_name, func) {
   }
 }
 
-function Awake_Watchers (variable, property, type, old_value, socket) { 
+function Verify(variable_name, func) { 
+  verifiers[variable_name] = func;
+}
+
+function Awake_Verifier (change, variable, property, change_type, old_value, socket) {
+  var id = variable['syc-object-id'],
+      verification = change;
+  
+  // TODO: This only accounts for the first variable to traverse onto this object
+  for (variable in verifiers) {
+    if (variable in object_paths) {
+      var verifier = verifiers[variable];
+      verification = verifier(change, variable, property, change_type, old_value, Path(id, variable), socket);
+    }
+  }
+
+  return verification;
+}
+
+
+function Awake_Watchers (variable, property, change_type, old_value, socket) { 
   var id = variable['syc-object-id'];
 
   // TODO: This only accounts for the first variable to traverse onto this object
@@ -425,7 +464,7 @@ function Awake_Watchers (variable, property, type, old_value, socket) {
     if (variable in object_paths) { 
       if (id in object_paths[variable]) { 
         watchers[variable].forEach( function (watcher) { 
-          watcher(variable, property, type, old_value, Path(id, variable), socket);
+          watcher(variable, property, change_type, old_value, Path(id, variable), socket);
         });
       }
     }
@@ -498,6 +537,7 @@ function Map_Object (variable) {
 }
 
 var visited = {};
+var hash_timer = 0;
 
 function Traverse () { 
   for (obj in Syc.objects) { 
@@ -515,6 +555,14 @@ function Traverse () {
     if (!(visited[obj])) { 
       delete Syc.objects[obj];
     }
+  }
+
+  hash_timer += Syc.polyfill_interval;
+  if (hash_timer > Syc.integrity_interval) {
+    hash_timer -= Syc.integrity_interval;
+    var hash = Generate_Hash();
+
+    Broadcast('syc-integrity-check', {hash: hash});
   }
 }
 
@@ -609,6 +657,25 @@ function Observer (name, object, type, old_value) {
 
   Observed([changes]);
 }
+
+function Generate_Hash () {
+  var stringified = JSON.stringify(object_map);
+    console.log(stringified)
+
+  return HashCode(stringified);
+
+  function HashCode (string) {
+    var hash = 0, i, chr, len;
+    if (string.length == 0) return hash;
+    for (i = 0, len = string.length; i < len; i++) {
+      chr   = string.charCodeAt(i);
+      hash  = ((hash << 5) - hash) + chr;
+      hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+  }
+}
+ 
 
 
 

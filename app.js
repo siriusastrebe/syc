@@ -49,11 +49,22 @@ var i = 0;
 
 v[i] = {}
 
-syc.watch('YO', function (a,b,c,d,e,f) { console.log(' - - - - ', a,b,c,d,e,f); });
+
+syc.verify('YO', function (change, variable, property, change_type, old_value, socket) { 
+  console.log(change, change_type);
+  if (Syc.type(change) === 'string' && change.substring(0, 1) === 'z')
+    return change;
+  if (Syc.type(change) === 'number' && change % 3 === 0)
+    return change;
+
+  return;
+});
+
+// syc.watch('YO', function (a,b,c,d,e,f) { console.log(' - - - - ', a,b,c,d,e,f); });
 
 
 // Test Aaron: Basic test for ensuring data passing
-/*
+/**/
 v[i++] = [[1, 2,], [3, 4]];
 v[i++] = {};
 
@@ -65,19 +76,21 @@ i++;
 
 
 
-*/
+/**/
 
 
 
 
  
 // Test Cathy, basic persistent test for polyfill comprehension of circular objects (Does not succeed currently)
+/*
 setInterval(function() { 
   var rand = random_word();
 //  v[i][rand] = 3;
   v[i][rand] = v[i];
 //  console.log(rand);
 }, 6000);
+*/
 
 
 

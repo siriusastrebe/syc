@@ -52,6 +52,8 @@ var Syc = {
         Syc.Receive_Change(data);
       } else if (title === 'syc-variable-new') { 
         Syc.New_Variable(data);
+      } else if (title === 'syc-integrity-check') { 
+        Syc.Integrity_Check(data);
       } else { 
         console.error("Syc error: Received a message title " + title + " which is not recognized");
       }
@@ -256,6 +258,60 @@ var Syc = {
         }
       }
     }
+  },
+
+  // ---- ---- ---- ----  Integrity Check  ---- ---- ---- ---- 
+  Integrity_Check: function (data) {
+    var foreign_hash = data.hash,
+//        local_hash = Generate_Hash();
+        local_hash = Syc.Generate_Hash();
+
+    console.log(foreign_hash);
+    console.log(local_hash);
+
+    if (foreign_hash !== local_hash) {
+      Syc.Emit('syc-reset-request');
+    }
+
+/*
+    function Generate_Hash () {
+      var stringified = JSON.stringify(Syc.object_map);
+  
+      return HashCode(stringified);
+
+      function HashCode (string) {
+        var hash = 0, i, chr, len;
+        if (string.length == 0) return hash;
+
+        for (i = 0, len = string.length; i < len; i++) {
+          chr   = string.charCodeAt(i);
+          hash  = ((hash << 5) - hash) + chr;
+          hash |= 0; // Convert to 32bit integer
+        }
+        return hash;
+      };
+
+}
+*/
+
+  },
+
+  Generate_Hash: function () {
+    var stringified = JSON.stringify(Syc.object_map);
+    console.log(stringified)
+    
+    return HashCode(stringified);
+
+    function HashCode (string) {
+      var hash = 0, i, chr, len;
+      if (string.length == 0) return hash;
+      for (i = 0, len = string.length; i < len; i++) {
+        chr   = string.charCodeAt(i);
+        hash  = ((hash << 5) - hash) + chr;
+        hash |= 0; // Convert to 32bit integer
+      }
+      return hash;
+    };
   },
   
   // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 

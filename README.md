@@ -61,15 +61,15 @@ Now syc will be able to sync variables with this client.
 
 Serving a variable restricts the client from making any changes to data bound to the served variable. Useful for when you do not want a malicious client to tampering with the data. 
 
-*Note*: To ensure good practice, Syc forbids one-way served variables from referencing or being referenced by objects bound to two-way variables.
+*Note*: To ensure good practice, Syc forbids one-way served variables from referencing or being referenced by two-way variables.
 
 
 ## Watchers (Client and Server Side)
 
 Occasionally, you'll want to be notified when a remote source changes your variable.
 
-    function alertMe (object, property, type, paths, old_value) {
-        alert(object, property, type, paths, old_value);
+    function alertMe (object, property, change_type, paths, old_value) {
+        alert(object, property, change_type, paths, old_value);
     }
     
     syc.watch('name', function)
@@ -84,15 +84,23 @@ At this point alertMe will be called, and you will see
 
 `object[property]` will get you the specific change. 
 
-`type` is the change type that happened, and can be one of `add`, `delete`, or `update`.
+`change_type` will be one of `add`, `delete`, or `update`.
 
 `paths` is a 2 dimensional list. Each inner list is a full path from the root of the variable, to the object where the change occurred (cycles are only counted once).
 
-    syc.watch('name', function (object, property, type, paths, old_value) { console.log(paths) })
+    syc.watch('name', function (object, property, change_type, paths, old_value) { console.log(paths) })
     synced.ascending[4] = 5;
     -> [['ascending', '4']]
 
-*Note:* Server side watchers have access to the originating socket `function (object, property, type, paths, old_value, socket)`
+*Note:* Server side watchers have access to the originating socket `function (object, property, change_type, paths, old_value, socket)`
+
+## Verifiers
+
+While watchers are good for alerting changes after they happen, often you'll want to verify that a change is harmless before it takes effect.
+
+    function check (change, object, property, change_type, paths, old_value, socket)
+
+
 
 - - - 
 This library is a work in progress.

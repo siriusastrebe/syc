@@ -68,39 +68,52 @@ Serving a variable restricts the client from making any changes to data bound to
 
 Occasionally, you'll want to be notified when a remote source changes your variable.
 
-    function alertMe (changes) {
-        console.log(changes);
+    function alertMe (change) {
+        console.log(change);
     }
     
     syc.watch('name', alertMe)
 
 This will pop up an alert every time you receive a remote change to an object bound to the variable 'name'.
 
-`changes` has the following properties available to it:
+`change` has the following properties available to it:
 
-`variable` - The variable whose property was modified.
+`change.variable` - The variable whose property was modified.
 
-`property` - The modified property. The actual changed value can be found in `variable[property]`.
+`change.property` - The modified property. The actual changed value can be found in `change.variable[change.property]`.
 
-`old_value` - A record of the previous value held in `variable[property]`.
+`change.root` - The root of the syc variable that triggered the watcher.
 
-`change_type` - Any one of `add`, `update` or `delete`.
+`change.old_value` - A record of the previous value held in `change.variable[change.property]`.
 
-`paths` - This is a nested list of the full path from the root of the syc variable to the location of the change.
+`change.change_type` - Any one of `add`, `update` or `delete`.
+
+`change.paths` - This is a 2-dimensional list. Each inner list is a full path from the root of the syc variable to the location of the change. Cycles are only counted once.
 
 *Note:* Server side watchers have access to the originating socket `function (changes, socket)`
 
-## Verifiers
+## Verifiers (Server side)
 
-While watchers are good for alerting changes after they happen, often you'll want to verify that a change is harmless before it takes effect.
+While watchers are good for alerting changes after they happen, often you'll want to verify that a change is harmless before it takes effect. Verifiers look similar to watchers, but `change` has an additional property `result`.
 
-    function check (change, object, property, change_type, paths, old_value, socket)
+    function check (change, socket) {
+      if (typeof change.result !== 'string') 
+        return false
+      else
+        return true
+    }
+    
+    Syc.verify('name', check)
+    
+If a client makes a change, verify will be called *before* the change happens. If the verifier returns a truthy value, the change is accepted and then any watchers will be called. If falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
+
+`change.result` can be modified within the verifying function and whatever value contained in change.result when the verifier returns will be used. **warning** change.result sometimes can reference an existing object, and modifications to change.result will reflect even if the verifier returns false.
 
 
 
 - - - 
 This library is a work in progress.
 
-Planned features: Verifiers, Observers, Synchronization/Integrity checks, Converting an existing variable to a Syc variable.
+Planned features: Observers, Converting an existing variable to a Syc variable.
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!

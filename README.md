@@ -79,9 +79,13 @@ This will pop up an alert every time you receive a remote change to an object bo
 `changes` has the following properties available to it:
 
 `variable` - The variable whose property was modified.
+
 `property` - The modified property. The actual changed value can be found in `variable[property]`.
+
 `old_value` - A record of the previous value held in `variable[property]`.
+
 `change_type` - Any one of `add`, `update` or `delete`.
+
 `paths` - This is a nested list of the full path from the root of the syc variable to the location of the change.
 
 *Note:* Server side watchers have access to the originating socket `function (changes, socket)`

@@ -45,26 +45,28 @@ y = new syc.sync('BRO');
 
 z = new syc.serve('HO');
 
+/*
 var i = 0;
 
 v[i] = {}
 
 
-syc.verify('YO', function (change, variable, property, change_type, old_value, socket) { 
-  console.log(change, change_type);
-  if (Syc.type(change) === 'string' && change.substring(0, 1) === 'z')
-    return change;
-  if (Syc.type(change) === 'number' && change % 3 === 0)
-    return change;
+/**/
+syc.verify('YO', function (simulated, changes, socket) { 
+  console.log(changes, simulated);
+  if (Syc.type(simulated) === 'string' && simulated.substring(0, 1) === 'z')
+    return true;
+  if (Syc.type(simulated) === 'number' && change % 3 === 0)
+    return true;
 
-  return;
+  return false;
 });
 
 // syc.watch('YO', function (a,b,c,d,e,f) { console.log(' - - - - ', a,b,c,d,e,f); });
 
 
 // Test Aaron: Basic test for ensuring data passing
-/**/
+/*
 v[i++] = [[1, 2,], [3, 4]];
 v[i++] = {};
 
@@ -73,6 +75,8 @@ v[i] = [[[]], []];
 v[i][0][0].push('yo');
 v[i][1].push(v[i][0][0]);
 i++;
+*/
+
 
 
 

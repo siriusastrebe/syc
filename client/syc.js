@@ -2,9 +2,7 @@ var Syc = {
   connect: function (socket) {
     Syc.Socket = socket;
 
-    socket.on('syc-object-change', Syc.Receive_Change);
-    socket.on('syc-variable-new', Syc.New_Variable);
-    socket.on('syc-messages', Syc.Receive_Message);
+    socket.on('syc-message-parcel', Syc.Receive_Message);
 
     if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, Syc.polyfill_interval);
   },
@@ -54,6 +52,10 @@ var Syc = {
         Syc.New_Variable(data);
       } else if (title === 'syc-integrity-check') { 
         Syc.Integrity_Check(data);
+      } else if (title === 'syc-object-sync') {
+	Syc.Sync_Object(data);
+      } else if (title === 'syc-reset-command') {
+	Syc.Reset(data);
       } else { 
         console.error("Syc error: Received a message title " + title + " which is not recognized");
       }
@@ -119,11 +121,11 @@ var Syc = {
         if (type === 'object') variable = {};
         if (type === 'array') variable = [];
 
-        id = Syc.Meta(variable, one_way, id);
-
         for (property in properties) {
           variable[property] = Syc.Resolve(properties[property])
         }
+
+        id = Syc.Meta(variable, one_way, id);
      
         Syc.Map_Object(variable);
 
@@ -149,6 +151,23 @@ var Syc = {
     if (type === 'undefined') return undefined;
 
     throw 'Object type ' + type + ' not supported by syc';
+  },
+
+  Sync_Object: function (data) {
+    var id = data.id,
+        variable = Syc.objects[id],
+        description = data.description;
+
+    for (property in variable) {
+      delete variable[property];
+    }
+
+    Syc.Resolve(description);
+  },
+
+  Reset: function (data) {
+    Syc.objects = {};
+    Syc.variables = {};
   },
 
   // ---- ---- ---- ----  Observing  ---- ---- ---- ----
@@ -186,11 +205,11 @@ var Syc = {
 
         var properties = {};
 
-        value = Syc.Meta(variable);
-
         for (property in variable) {
           properties[property] = Syc.Describe(variable[property], variable, property);
         }
+
+        value = Syc.Meta(variable);
 
         Syc.Map_Object(variable);
 
@@ -218,11 +237,13 @@ var Syc = {
 
     Syc.objects[id] = variable;
     Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
-    if (Object.observe) Object.observe(variable, Syc.Observed);
-
+    
     if (one_way) {
       Object.defineProperty(variable, 'syc-one-way', {value: true, enumerable: false});
     }
+
+    if (Object.observe) Object.observe(variable, Syc.Observed);
+
 
     function token () { 
       // TODO: There's a small offchance that two separate clients could create an object with the same token before it's registered by the server.
@@ -263,21 +284,24 @@ var Syc = {
   // ---- ---- ---- ----  Integrity Check  ---- ---- ---- ---- 
   Integrity_Check: function (data) {
     var foreign_hash = data.hash,
-//        local_hash = Generate_Hash();
-        local_hash = Syc.Generate_Hash();
+        local_hash = Generate_Hash();
 
     console.log(foreign_hash);
     console.log(local_hash);
 
     if (foreign_hash !== local_hash) {
-      Syc.Emit('syc-reset-request');
+      Syc.Socket.emit('syc-reset-request');
     }
 
-/*
     function Generate_Hash () {
-      var stringified = JSON.stringify(Syc.object_map);
+      var hash = 0;
   
-      return HashCode(stringified);
+      for (object in Syc.object_map) {
+        var stringified = JSON.stringify(Syc.object_map[object]);
+        hash += HashCode(stringified);
+      }
+
+      return hash;
 
       function HashCode (string) {
         var hash = 0, i, chr, len;
@@ -290,12 +314,10 @@ var Syc = {
         }
         return hash;
       };
-
-}
-*/
-
+    }
   },
 
+/*
   Generate_Hash: function () {
     var stringified = JSON.stringify(Syc.object_map);
     console.log(stringified)
@@ -313,6 +335,7 @@ var Syc = {
       return hash;
     };
   },
+*/
   
   // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
   // ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 

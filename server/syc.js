@@ -10,6 +10,8 @@ var buffers = [];
 var mapping_timer;
 var send_timer;
 
+var reset_counter = {};
+
 Syc = {
   connect: function (socket) { 
     connected.push(socket);
@@ -41,8 +43,9 @@ Syc = {
   objects: {},
 
   polyfill_interval: 200,
-  integrity_interval: 12000,
-  buffer_delay: 20
+  integrity_interval: 18000,
+  buffer_delay: 20,
+  reset_limit: 8
 }
 
                 
@@ -109,7 +112,7 @@ function Buffer (title, data, audience) {
             continue;
           }
 
-          socket.emit('syc-messages', messages);
+          socket.emit('syc-message-parcel', messages);
         }
 
         buffers = [];
@@ -284,42 +287,37 @@ function Receive_Change (data, socket) {
 
   var variable = Syc.objects[id];
 
+  if (variable === undefined)
+    console.warn("Received changes to an unknown object: " + id);
+
   if (variable['syc-one-way'] === true) { 
     console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
-    Reset(socket);
+    Emit('syc-object-sync', {id: id, description: Describe_Recursive(variable)}, [socket])
   }
 
   var old_value = variable[property];
 
-  if (variable === undefined)
-    console.warn("Received changes to an unknown object: " + id);
+  if (type === 'delete')
+    var result = undefined;
+  else
+    var result = Apply_Changes(changes, type);
 
-  if (observable) observe_lock[id] = true;
+  var verified = Awake_Verifier(result, variable, property, type, old_value, socket);
 
-  if (type === 'add' || type === 'update') { 
-    var simulated = Apply_Changes(changes, type);
-    var verified = Awake_Verifier(simulated, variable, property, type, old_value, socket);
+  if (verified) { 
+    if (observable) observe_lock[id] = true;
 
-    if (verified !== undefined) { 
-      variable[property] = verified;
-    } else { 
-      return
-    }
-  } else if (type === 'delete') {
-    var verified = Awake_Verifier(true, variable, property, type, old_value, socket);
-    
-    if (verified !== false) { 
-      delete variable[property];
-    } else { 
-      return;
-    }
+    variable[property] = result;
+
+    Map_Object(variable);
+
+    Awake_Watchers(variable, property, type, old_value, socket);
+
+    Broadcast('syc-object-change', data, socket);
+
+  } else {
+    Emit('syc-object-sync', {id: id, description: Describe_Recursive(variable)}, [socket])
   }
-
-  Map_Object(variable);
-
-  Awake_Watchers(variable, property, type, old_value, socket);
-
-  Broadcast('syc-object-change', data, socket);
 }
 
 function Apply_Changes (changes) { 
@@ -344,11 +342,11 @@ function Apply_Changes (changes) {
       if (type === 'object') variable = {};
       if (type === 'array') variable = [];
 
-      id = Meta(variable, false, id);
-      
       for (property in properties) {
         variable[property] = Apply_Changes(properties[property])
       }
+
+      id = Meta(variable, false, id);
 
       Map_Object(variable);
 
@@ -367,8 +365,6 @@ function Meta (variable, one_way,  id) {
 
   var id = id || token();
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
-
-  Object.defineProperty(variable, 'syc-path-names', {value: {}, enumerable: false});
 
   if (one_way) { 
     Object.defineProperty(variable, 'syc-one-way', {value: true, enumerable: false});
@@ -416,7 +412,24 @@ function Recurrable (type) {
 // ---- ---- ---- ----  Requests  ---- ---- ---- ----
 
 function Reset (socket) { 
-  var described = {};
+  var described = {},
+      sid = socket.id;
+
+  if (sid in reset_counter) {
+    if (reset_counter[sid] > Syc.reset_limit + 2) {
+      return
+    } else if (reset_counter[sid] > Syc.reset_limit) {
+      console.warn('Syc: integrity check + reset failed ' + reset_counter[sid] + ' times with client ' + sid + '. Giving up on hard resetting client.');
+
+      reset_counter[sid] += 100;
+    } else {
+      reset_counter[sid] += 2;
+    }
+  } else {
+    reset_counter[socket.id] = 2;
+  }
+
+  Emit('syc-reset-command', {}, [socket]);
 
   for (name in Syc.variables) {
     var id = Syc.variables[name],
@@ -440,15 +453,26 @@ function Verify(variable_name, func) {
   verifiers[variable_name] = func;
 }
 
-function Awake_Verifier (change, variable, property, change_type, old_value, socket) {
+function Awake_Verifier (result, variable, property, change_type, old_value, socket) {
   var id = variable['syc-object-id'],
-      verification = change;
+      verification = true;
   
+  var change = {};
+  
+  change.variable = variable;
+  change.property = property;
+  change.change_type = change_type;
+  change.old_value = old_value;
+
   // TODO: This only accounts for the first variable to traverse onto this object
-  for (variable in verifiers) {
-    if (variable in object_paths) {
-      var verifier = verifiers[variable];
-      verification = verifier(change, variable, property, change_type, old_value, Path(id, variable), socket);
+  for (name in verifiers) {
+    if (name in object_paths) {
+      if (id in object_paths[name]) {
+        var verifier = verifiers[name];
+        change.paths = Path(id, name);
+
+        verification = verifier(result, change, socket);
+      }
     }
   }
 
@@ -459,12 +483,20 @@ function Awake_Verifier (change, variable, property, change_type, old_value, soc
 function Awake_Watchers (variable, property, change_type, old_value, socket) { 
   var id = variable['syc-object-id'];
 
+  var change = {};
+
+  change.variable = variable;
+  change.property = property;
+  change.change_type = change_type;
+  change.old_value = old_value;
+
   // TODO: This only accounts for the first variable to traverse onto this object
-  for (variable in watchers) { 
-    if (variable in object_paths) { 
-      if (id in object_paths[variable]) { 
-        watchers[variable].forEach( function (watcher) { 
-          watcher(variable, property, change_type, old_value, Path(id, variable), socket);
+  for (name in watchers) { 
+    if (name in object_paths) { 
+      if (id in object_paths[name]) { 
+        change.paths = Path(id, name);
+        watchers[name].forEach( function (watcher) { 
+          watcher(change, socket);
         });
       }
     }
@@ -555,6 +587,12 @@ function Traverse () {
     if (!(visited[obj])) { 
       delete Syc.objects[obj];
     }
+  }
+
+  // Integrity check
+  for (sid in reset_counter) {
+    if (reset_counter[sid] > 0) reset_counter[sid] -= 1;
+    else delete reset_counter[sid];
   }
 
   hash_timer += Syc.polyfill_interval;
@@ -659,10 +697,14 @@ function Observer (name, object, type, old_value) {
 }
 
 function Generate_Hash () {
-  var stringified = JSON.stringify(object_map);
-    console.log(stringified)
+  var hash = 0;
 
-  return HashCode(stringified);
+  for (object in object_map) {
+    var stringified = JSON.stringify(object_map[object]);
+    hash += HashCode(stringified);
+  }
+
+  return hash;
 
   function HashCode (string) {
     var hash = 0, i, chr, len;

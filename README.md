@@ -57,7 +57,7 @@ Now syc will be able to sync variables with this client.
 ## One-way Variables (Server side)
 
     // Server side 
-    var served = new syc.serve('name')
+    var served = new syc.serve('name');
 
 Serving a variable restricts the client from making any changes to data bound to the served variable. Useful for when you do not want a malicious client to tampering with the data. 
 
@@ -98,16 +98,16 @@ While watchers are good for alerting changes after they happen, often you'll wan
 
     function check (change, socket) {
       if (typeof change.result !== 'string') 
-        return false
+        return false;
       else
-        return true
+        return true;
     }
     
     Syc.verify('name', check)
     
 If a client makes a change, verify will be called *before* the change happens. If the verifier returns a truthy value, the change is accepted and then any watchers will be called. If falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
-`change.result` can be modified within the verifying function and whatever value contained in change.result when the verifier returns will be used. **warning** change.result sometimes can reference an existing object, and modifications to change.result will reflect even if the verifier returns false.
+`change.result` can be modified within the verifying function and whatever value contained in change.result when the verifier returns will be used. **Warning**: change.result sometimes can reference an existing object, and modifications to change.result will reflect even if the verifier returns false.
 
 
 

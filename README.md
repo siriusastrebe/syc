@@ -114,6 +114,6 @@ You can have multiple watchers on the same variable, but only one verifier per i
 - - - 
 This library is a work in progress.
 
-Planned features: Observers, Converting an existing variable to a Syc variable.
+Future features: Observers, Groups (Still in planning).
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!

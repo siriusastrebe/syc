@@ -76,17 +76,17 @@ This will pop up an alert every time you receive a remote change to an object bo
 
 `change` has the following properties available to it:
 
-`change.variable` - The variable whose property was modified.
+    `change.variable` - The variable whose property was modified.
 
-`change.property` - The modified property. The actual changed value can be found in `change.variable[change.property]`.
+    `change.property` - The modified property. The actual changed value can be found in `change.variable[change.property]`.
 
-`change.root` - The root of the syc variable that triggered the watcher.
+    `change.root` - The root of the syc variable that triggered the watcher.
 
-`change.old_value` - A record of the previous value held in `change.variable[change.property]`.
+    `change.old_value` - A record of the previous value held in `change.variable[change.property]`.
 
-`change.change_type` - Any one of `add`, `update` or `delete`.
+    `change.change_type` - Any one of `add`, `update` or `delete`.
 
-`change.paths` - This is a 2-dimensional list. Each inner list is a full path from the root of the syc variable to the location of the change. Cycles are only counted once.
+    `change.paths` - This is a 2-dimensional list. Each inner list is a full path from the root of the syc variable to the location of the change. Cycles are only counted once.
 
 *Note:* Server side watchers have access to the originating socket `function (changes, socket)`
 

@@ -107,6 +107,8 @@ While watchers are good for alerting changes after they happen, often you'll wan
     
 If a client makes a change, verify will be called *before* the change happens. If the verifier returns a truthy value, the change is accepted and then any watchers will be called. If falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
+You can have multiple watchers on the same variable, but only one verifier per instance of Syc.sync().
+
 `change.result` can be modified within the verifying function and whatever value contained in change.result when the verifier returns will be used. **Warning**: change.result sometimes can reference an existing object, and modifications to change.result will reflect even if the verifier returns false.
 
 

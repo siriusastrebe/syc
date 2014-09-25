@@ -17,20 +17,18 @@ To sync a variable from the server to the client:
     var synced = new syc.sync('name')
     synced['hello'] = 'world';
     
-The client will be able to access this variable by getting the reference to it:
+The client can use `syc.list()` to see all existing syc variables.
 
     // On the client side...
     var synced = syc.list('name')
     synced.hello
     -> "world"
     
-You can change the data on either the server or the client...
-    
+You can change the data on either the server or the client... And see the change reflected everywhere else.    
+
     synced.goodbye = "farewell!"
 
-And see the change reflected everywhere else.
-
-    // On the server or any client...
+    // elsewhere...
     synced.goodbye
     -> "farewell!"
 

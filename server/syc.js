@@ -21,16 +21,29 @@ Syc = {
 
     Reset(socket);
     
-    if (!mapping_timer) mapping_timer = setInterval(Traverse, (Syc.polyfill_interval > Syc.integrity_interval) ? Syc.integrity_interval : Syc.polyfill_interval);
+    if (Object.observe)
+      Syc.traversal_interval = Syc.integrity_interval;
+    else
+      Syc.traversal_interval = Syc.polyfill_interval;
+
+    if (!mapping_timer) mapping_timer = setInterval(Traverse, Syc.traversal_interval);
   },
   
-  sync: function (name) {
-    Namespace(this, 'sync');
-    Name(name, this);
+  sync: function (name, variable) {
+    if (variable instanceof Syc.sync)
+      var variable = this; 
+    if (variable === undefined)
+      var variable = {};
+
+    Name(name, variable);
   },
 
   serve: function (name) {
-    Namespace(this, 'serve');
+    if (variable instanceof Syc.sync)
+      var variable = this; 
+    if (variable === undefined)
+      var variable = {};
+
     Name(name, this, true);
   },
 
@@ -42,8 +55,8 @@ Syc = {
   variables: {},
   objects: {},
 
-  polyfill_interval: 200,
-  integrity_interval: 18000,
+  polyfill_interval: 260,
+  integrity_interval: 24000,
   buffer_delay: 20,
   reset_limit: 8
 }
@@ -124,12 +137,6 @@ function Buffer (title, data, audience) {
 }
 
 
-function Namespace (variable, kind) { 
-  if ( !(variable instanceof Syc.sync) && !(variable instanceof Syc.serve) ) {
-    throw "Improper use of Syc." + kind + "(). Try: 'new Syc." + kind + "()'";
-  }
-}
-
 
 /* ---- ---- ---- ----  Observing and New Variables  ---- ---- ---- ---- */
 function Name (name, variable, one_way) { 
@@ -165,6 +172,8 @@ function Observed (changes) {
     }
 
     changes = Describe(changed, object, property);
+
+    Map_Object(variable);
 
     Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
   }
@@ -298,22 +307,27 @@ function Receive_Change (data, socket) {
   var old_value = variable[property];
 
   if (type === 'delete')
-    var result = undefined;
+    var change = {result: undefined};
   else
-    var result = Apply_Changes(changes, type);
+    var change = {result: Apply_Changes(changes, type)};
 
-  var verified = Awake_Verifier(result, variable, property, type, old_value, socket);
+  var verified = Awake_Verifier(change, variable, property, type, old_value, socket);
 
   if (verified) { 
     if (observable) observe_lock[id] = true;
 
-    variable[property] = result;
+    variable[property] = change.result;
 
     Map_Object(variable);
 
     Awake_Watchers(variable, property, type, old_value, socket);
+    
+    var description = Describe(variable[property], variable, property);
 
-    Broadcast('syc-object-change', data, socket);
+    if (description.type === changes.type && description.value === changes.value)
+      Broadcast('syc-object-change', {type: type, id: id, property: property, changes: description}, socket);
+    else
+      Broadcast('syc-object-change', {type: type, id: id, property: property, changes: description});
 
   } else {
     Emit('syc-object-sync', {id: id, description: Describe_Recursive(variable)}, [socket])
@@ -453,11 +467,9 @@ function Verify(variable_name, func) {
   verifiers[variable_name] = func;
 }
 
-function Awake_Verifier (result, variable, property, change_type, old_value, socket) {
+function Awake_Verifier (change, variable, property, change_type, old_value, socket) {
   var id = variable['syc-object-id'],
       verification = true;
-  
-  var change = {};
   
   change.variable = variable;
   change.property = property;
@@ -469,9 +481,11 @@ function Awake_Verifier (result, variable, property, change_type, old_value, soc
     if (name in object_paths) {
       if (id in object_paths[name]) {
         var verifier = verifiers[name];
-        change.paths = Path(id, name);
 
-        verification = verifier(result, change, socket);
+        change.paths = Path(id, name);
+        change.root = Syc.objects[Syc.variables[name]];
+
+        verification = verifier(change, socket);
       }
     }
   }
@@ -495,6 +509,8 @@ function Awake_Watchers (variable, property, change_type, old_value, socket) {
     if (name in object_paths) { 
       if (id in object_paths[name]) { 
         change.paths = Path(id, name);
+        change.root = Syc.objects[Syc.variables[name]];
+
         watchers[name].forEach( function (watcher) { 
           watcher(change, socket);
         });
@@ -595,8 +611,8 @@ function Traverse () {
     else delete reset_counter[sid];
   }
 
-  hash_timer += Syc.polyfill_interval;
-  if (hash_timer > Syc.integrity_interval) {
+  hash_timer += Syc.traversal_interval;
+  if (hash_timer >= Syc.integrity_interval) {
     hash_timer -= Syc.integrity_interval;
     var hash = Generate_Hash();
 

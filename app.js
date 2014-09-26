@@ -39,9 +39,11 @@ io.on('connection', function (socket) {
   syc.connect(socket);
 });
 
+var bruddah = [1,3,3,7];
+
 v = new syc.sync('YO');
 
-y = new syc.sync('BRO');
+y = syc.sync('BRO', bruddah);
 
 z = new syc.serve('HO');
 
@@ -52,12 +54,14 @@ v[i] = {}
 
 
 /**/
-syc.verify('YO', function (simulated, changes, socket) { 
-  console.log(changes, simulated);
-  if (Syc.type(simulated) === 'string' && simulated.substring(0, 1) === 'z')
+syc.verify('YO', function (change, socket) { 
+  console.log(change);
+  if (Syc.type(change.result) === 'string' && change.result.substring(0, 1) === 'z')
     return true;
-  if (Syc.type(simulated) === 'number' && change % 3 === 0)
+  if (Syc.type(change.result) === 'number') {
+    change.result = 'ha ha ha';
     return true;
+  }
 
   return false;
 });

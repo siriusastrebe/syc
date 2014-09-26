@@ -4,7 +4,8 @@ var Syc = {
 
     socket.on('syc-message-parcel', Syc.Receive_Message);
 
-    if (!(Syc.mapping_timer)) Syc.mapping_timer = setInterval(Syc.Traverse, Syc.polyfill_interval);
+    if ( !(Object.observe) && !(Syc.mapping_timer) )
+      Syc.mapping_timer = setInterval(Syc.Traverse, Syc.polyfill_interval);
   },
 
   list: function (name) {
@@ -27,7 +28,7 @@ var Syc = {
   variables: {},
   objects: {},
 
-  polyfill_interval: 200,
+  polyfill_interval: 260,
 
   watchers: {},
 
@@ -53,9 +54,9 @@ var Syc = {
       } else if (title === 'syc-integrity-check') { 
         Syc.Integrity_Check(data);
       } else if (title === 'syc-object-sync') {
-	Syc.Sync_Object(data);
+	      Syc.Sync_Object(data);
       } else if (title === 'syc-reset-command') {
-	Syc.Reset(data);
+	      Syc.Reset(data);
       } else { 
         console.error("Syc error: Received a message title " + title + " which is not recognized");
       }
@@ -191,6 +192,8 @@ var Syc = {
 
       var changes = Syc.Describe(changed, object, property);
 
+      Syc.Map_Object(object);
+
       Syc.Socket.emit('syc-object-change', { id: id, type: type,  property: property, changes: changes });
     }
   },
@@ -269,12 +272,22 @@ var Syc = {
   Awake_Watchers: function (variable, property, type, old_value) { 
     var id = variable['syc-object-id'];
 
+    var change = {};
+
+    change.variable = variable;
+    change.property = property;
+    change.change_type = type;
+    change.old_value = old_value;
+
     // TODO: This only accounts for the first variable to traverse onto this object
     for (variable in Syc.watchers) { 
       if (variable in Syc.object_paths) { 
         if (id in Syc.object_paths[variable]) { 
+          change.paths = Path(id, name);
+          change.root = Syc.objects[Syc.variables[name]];
+
           Syc.watchers[variable].forEach( function (watcher) { 
-            watcher(variable, property, type, old_value, Syc.Path(id, variable));
+            watcher(change);
           });
         }
       }
@@ -283,6 +296,8 @@ var Syc = {
 
   // ---- ---- ---- ----  Integrity Check  ---- ---- ---- ---- 
   Integrity_Check: function (data) {
+    Syc.Traverse();
+
     var foreign_hash = data.hash,
         local_hash = Generate_Hash();
 
@@ -357,6 +372,7 @@ var Syc = {
 
 
   Traverse: function () { 
+    console.log('traversing');
     var visited = {};
  
     for (obj in Syc.objects) { 

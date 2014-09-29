@@ -4,9 +4,11 @@ function arrFloatProfile () {
   for (var i=0; i<100000; i++) 
   { 
     a.push(Math.random()*x);
-    a.sort(); 
-    for (var j=0; j<1000000; j++) { 
-      delete a[j];
-    }
+  }
+  a.sort(); 
+  for (var i=0; i<99999; i++) {
+  }
+  for (var j=0; j<1000000; j++) { 
+    delete a[j];
   }
 }

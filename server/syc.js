@@ -201,8 +201,6 @@ function Describe (variable, parent, pathname) {
 
       value = Meta(variable, one_way);
 
-      Update_Path(variable, parent, pathname, 'add');
-
       for (property in variable) {
         properties[property] = Describe(variable[property], variable, property);
       }
@@ -213,8 +211,6 @@ function Describe (variable, parent, pathname) {
     } else { 
       var one_way = variable['syc-one-way'];
       Variable_Compatibility(variable, parent, pathname);
-
-      Update_Path(variable, parent, pathname, 'add');
 
       return {type: type, id: value, one_way: one_way};
     }
@@ -236,10 +232,6 @@ function Describe_Recursive (variable, visited, parent, pathname) {
       value = Meta(variable, one_way);
     } else if (parent) { 
       Variable_Compatibility(variable, parent, pathname);
-    }
-
-    if (parent) { 
-      Update_Path(variable, parent, pathname, 'add');
     }
 
     if (visited === undefined) var visited = [];
@@ -267,25 +259,6 @@ function Variable_Compatibility (variable, parent, pathname) {
     throw "Syc error: Objects assigned to one-way served variables cannot be mixed with two-way synced objects."
   }
 }
-
-
-function Update_Path (variable, parent, pathname, mode) { 
-  var parent_id = parent['syc-object-id'],
-      paths = variable['syc-path-names'],
-      specific_paths = paths[parent_id];
-
-  if (mode === 'add') { 
-    if (specific_paths !== undefined) { 
-      if (specific_paths.indexOf(pathname) === -1) { 
-        specific_paths.push(pathname);
-      }
-    } else { 
-      paths[parent_id] = [pathname];
-    }
-  }
-}
-
-
 
 
 function Receive_Change (data, socket) { 
@@ -324,7 +297,7 @@ function Receive_Change (data, socket) {
     
     var description = Describe(variable[property], variable, property);
 
-    if (description.type === changes.type && description.value === changes.value)
+    if (description.type === changes.type || description.value === changes.value)
       Broadcast('syc-object-change', {type: type, id: id, property: property, changes: description}, socket);
     else
       Broadcast('syc-object-change', {type: type, id: id, property: property, changes: description});

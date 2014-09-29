@@ -159,6 +159,8 @@ var Syc = {
         variable = Syc.objects[id],
         description = data.description;
 
+    if (Syc.observable) Syc.observe_lock[id] = true;
+
     for (property in variable) {
       delete variable[property];
     }

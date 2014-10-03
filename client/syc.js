@@ -42,7 +42,6 @@ var Syc = {
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
   Receive_Message: function (messages) { 
     messages.forEach( function (message) { 
-      console.log(message);
 
       var title = message[0],
           data = message[1];
@@ -282,13 +281,13 @@ var Syc = {
     change.old_value = old_value;
 
     // TODO: This only accounts for the first variable to traverse onto this object
-    for (variable in Syc.watchers) { 
-      if (variable in Syc.object_paths) { 
-        if (id in Syc.object_paths[variable]) { 
-          change.paths = Path(id, name);
+    for (name in Syc.watchers) { 
+      if (name in Syc.object_paths) { 
+        if (id in Syc.object_paths[name]) { 
+          change.paths = Syc.Path(id, name);
           change.root = Syc.objects[Syc.variables[name]];
 
-          Syc.watchers[variable].forEach( function (watcher) { 
+          Syc.watchers[name].forEach( function (watcher) { 
             watcher(change);
           });
         }
@@ -302,9 +301,6 @@ var Syc = {
 
     var foreign_hash = data.hash,
         local_hash = Generate_Hash();
-
-    console.log(foreign_hash);
-    console.log(local_hash);
 
     if (foreign_hash !== local_hash) {
       Syc.Socket.emit('syc-reset-request');
@@ -334,26 +330,7 @@ var Syc = {
     }
   },
 
-/*
-  Generate_Hash: function () {
-    var stringified = JSON.stringify(Syc.object_map);
-    console.log(stringified)
-    
-    return HashCode(stringified);
 
-    function HashCode (string) {
-      var hash = 0, i, chr, len;
-      if (string.length == 0) return hash;
-      for (i = 0, len = string.length; i < len; i++) {
-        chr   = string.charCodeAt(i);
-        hash  = ((hash << 5) - hash) + chr;
-        hash |= 0; // Convert to 32bit integer
-      }
-      return hash;
-    };
-  },
-*/
-  
   // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
   // ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 
   // Map_Object should come after a call to Meta for the variable in question, and
@@ -374,7 +351,6 @@ var Syc = {
 
 
   Traverse: function () { 
-    console.log('traversing');
     var visited = {};
  
     for (obj in Syc.objects) { 

@@ -43,6 +43,8 @@ var Syc = {
   Receive_Message: function (messages) { 
     messages.forEach( function (message) { 
 
+      console.log(message);
+
       var title = message[0],
           data = message[1];
 

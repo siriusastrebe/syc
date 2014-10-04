@@ -219,6 +219,33 @@ function Describe (variable, parent, pathname) {
   }
 }
 
+function Describe_Properties (variable, parent, pathname) {
+  var type = Type(variable),
+      value = Evaluate(type, variable);
+
+  if (Recurrable(type)) { 
+    var properties = {};
+
+    if (value === undefined) { 
+      var one_way = parent['syc-one-way'];
+      value = Meta(variable, one_way);
+    } else {
+      var one_way = variable['syc-one-way'];
+      Variable_Compatibility(variable, parent, pathname);
+    }
+
+    for (property in variable) {
+      properties[property] = Describe(variable[property], variable, property);
+    }
+
+    Map_Object(variable);
+
+    return {type: type, id: value, properties: properties, one_way: one_way};
+  } else { 
+    return {type: type, value: value};
+  }
+}
+
 
 function Describe_Recursive (variable, visited, parent, pathname) { 
   var type = Type(variable),
@@ -274,7 +301,7 @@ function Receive_Change (data, socket) {
 
   if (variable['syc-one-way'] === true) { 
     console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
-    Emit('syc-object-sync', {id: id, description: Describe_Recursive(variable)}, [socket])
+    Emit('syc-object-sync', {id: id, description: Describe_Properties(variable)}, [socket])
   }
 
   var old_value = variable[property];
@@ -295,7 +322,7 @@ function Receive_Change (data, socket) {
 
     Awake_Watchers(variable, property, type, old_value, socket);
     
-    var description = Describe(variable[property], variable, property);
+    var description = Describe_Properties(variable[property], variable, property);
 
     if (description.type === changes.type || description.value === changes.value)
       Broadcast('syc-object-change', {type: type, id: id, property: property, changes: description}, socket);

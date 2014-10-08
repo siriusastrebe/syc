@@ -64,21 +64,26 @@ Serving a variable restricts the client from making any changes to data bound to
 
 ## Watchers (Client and Server Side)
 
-Occasionally, you'll want to be notified when a remote source changes your variable.
+Occasionally, you'll want to be notified when changes are made to you variable.
 
     function alertMe (change) {
         console.log(change);
     }
     
-    syc.watch('name', alertMe)
+    syc.watch('name', alertMe, {remote: true, local: true})
 
-This will pop up an alert every time you receive a remote change to an object bound to the variable 'name'.
+This every time you receive a remote change to an object bound to the variable 'name'. Ommitting the preferences argument will default to the watcher triggering on both remote and local changes.
+
+Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
+
 
 `change` has the following properties available to it:
 
 `change.variable` - The variable whose property was modified.
 
-`change.property` - The modified property. The actual changed value can be found in `change.variable[change.property]`.
+`change.property` - The modified property name. The actual changed value can be found in `change.variable[change.property]`.
+
+`change.change` - The actual changed value, shorthand for `change.variable[change.property]`
 
 `change.root` - The root of the syc variable that triggered the watcher.
 
@@ -102,8 +107,10 @@ While watchers are good for alerting changes after they happen, often you'll wan
     }
     
     Syc.verify('name', check)
-    
-If a client makes a change, verify will be called *before* the change happens. If the verifier returns a truthy value, the change is accepted and then any watchers will be called. If falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
+
+By its nature, verifiers are only triggered on receiving a change from a client.
+
+When a client makes a change, verifiers will be called *before* the change happens. If the verifier returns a truthy value, the change is accepted and then any watchers will be called. If falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
 You can have multiple watchers on the same variable, but only one verifier per instance of Syc.sync().
 
@@ -114,6 +121,6 @@ You can have multiple watchers on the same variable, but only one verifier per i
 - - - 
 This library is a work in progress.
 
-Future features: Observers, Groups (Still in planning).
+Planned features: , Groups (Still in discussion).
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!

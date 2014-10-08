@@ -87,7 +87,7 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 `change.root` - The root of the syc variable that triggered the watcher.
 
-`change.old_value` - A record of the previous value held in `change.variable[change.property]`.
+`change.oldValue` - A record of the previous value held in `change.variable[change.property]`.
 
 `change.change_type` - Any one of `add`, `update` or `delete`.
 

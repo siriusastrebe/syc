@@ -1,5 +1,6 @@
 var connected = [];
 var observe_lock = {};
+var observe_redirect = {};
 var object_map = {};
 var observable = !!Object.observe;
 var object_paths = {};
@@ -17,7 +18,7 @@ Syc = {
     connected.push(socket);
 
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
-    socket.on('syc-reset-request', function (data) { Reset(socket) }) 
+    socket.on('syc-reset-request', function (data) { Reset(socket), Handshake(socket) }) 
 
     Reset(socket);
     
@@ -56,7 +57,7 @@ Syc = {
   objects: {},
 
   polyfill_interval: 260,
-  integrity_interval: 24000,
+  integrity_interval: 36000,
   buffer_delay: 20,
   reset_limit: 8
 }
@@ -90,9 +91,9 @@ function Broadcast (title, data, sender) {
       index = audience.indexOf(sender);
 
   if (index !== -1) { 
-    audience.splice(index, 1);
-  }
-
+      audience.splice(index, 1); // Ommit the sender
+   }
+  
   Buffer(title, data, audience);
 }
 
@@ -107,17 +108,17 @@ function Buffer (title, data, audience) {
 
         buffers.forEach( function (message) { 
           message.audience.forEach (function (member) { 
-            var id = member.id;
+            var sid = member.id;
             
-            if (sockets[id]) sockets[id].push([message.title, message.data]);
-            else sockets[id] = [member, [message.title, message.data]];
+            if (sockets[sid]) sockets[sid].push([message.title, message.data]);
+            else sockets[sid] = [member, [message.title, message.data]];
           });
         });
 
-        for (id in sockets) {
+        for (var sid in sockets) {
           // TODO: This is kinda a hilarious hack...
-          var socket = sockets[id][0];
-          var messages = sockets[id].splice(1);
+          var socket = sockets[sid][0];
+          var messages = sockets[sid].splice(1);
 
           if (socket.disconnected) {
             var index = connected.indexOf(socket);
@@ -152,30 +153,35 @@ function Name (name, variable, one_way) {
 
   Map_Object(variable);
 
-  Emit('syc-variable-new', {name: name, id: id, description: description});
+  Broadcast('syc-variable-new', {name: name, value: id, description: description});
 }
 
 
 function Observed (changes) { 
-  for (change in changes) { 
+  for (var change in changes) { 
     var object = changes[change].object,
         property = changes[change].name,
         changed = object[property],
         type = Standardize_Change_Type(changes[change].type),
-        old_value = changes[change].old_value;
+        oldValue = changes[change].oldValue,
         id = object['syc-object-id'];
 
-    var changes;
-
-    if (observable && id in observe_lock) {
+    if (observable && observe_lock[id]) {
       delete observe_lock[id]; return
     }
 
+    var changes;
     changes = Describe(changed, object, property);
 
-    Map_Object(variable);
+    Map_Property(object, property);
 
-    Emit('syc-object-change', { id: id, type: type, property: property, changes: changes });
+    var data = { value: id, type: type, property: property, changes: changes }
+
+    if (observe_redirect[id]) {
+      Emit('syc-object-change', data, observe_redirect[id]);
+    } else {
+      Broadcast('syc-object-change', data);
+    }
   }
 }
 
@@ -201,46 +207,19 @@ function Describe (variable, parent, pathname) {
 
       value = Meta(variable, one_way);
 
-      for (property in variable) {
+      for (var property in variable) {
         properties[property] = Describe(variable[property], variable, property);
       }
 
       Map_Object(variable);
 
-      return {type: type, id: value, properties: properties, one_way: one_way};
+      return {type: type, value: value, properties: properties, one_way: one_way};
     } else { 
       var one_way = variable['syc-one-way'];
       Variable_Compatibility(variable, parent, pathname);
 
-      return {type: type, id: value, one_way: one_way};
+      return {type: type, value: value, one_way: one_way};
     }
-  } else { 
-    return {type: type, value: value};
-  }
-}
-
-function Describe_Properties (variable, parent, pathname) {
-  var type = Type(variable),
-      value = Evaluate(type, variable);
-
-  if (Recurrable(type)) { 
-    var properties = {};
-
-    if (value === undefined) { 
-      var one_way = parent['syc-one-way'];
-      value = Meta(variable, one_way);
-    } else {
-      var one_way = variable['syc-one-way'];
-      Variable_Compatibility(variable, parent, pathname);
-    }
-
-    for (property in variable) {
-      properties[property] = Describe(variable[property], variable, property);
-    }
-
-    Map_Object(variable);
-
-    return {type: type, id: value, properties: properties, one_way: one_way};
   } else { 
     return {type: type, value: value};
   }
@@ -262,22 +241,23 @@ function Describe_Recursive (variable, visited, parent, pathname) {
     }
 
     if (visited === undefined) var visited = [];
-    if (visited.indexOf(value) !== -1) return {type: type, id: value};
+    if (visited.indexOf(value) !== -1) return {type: type, value: value};
     visited.push(value);
 
     var properties = {};
 
-    for (property in variable) {
+    for (var property in variable) {
       properties[property] = Describe_Recursive(variable[property], visited, variable, property);
     }
 
     Map_Object(variable);
 
-    return {type: type, id: value, properties: properties, one_way: one_way};
+    return {type: type, value: value, properties: properties, one_way: one_way};
   } else { 
     return {type: type, value: value};
   }
 }
+
 
 
 function Variable_Compatibility (variable, parent, pathname) { 
@@ -290,102 +270,184 @@ function Variable_Compatibility (variable, parent, pathname) {
 
 function Receive_Change (data, socket) { 
   var type     = data.type,
-      id       = data.id,
+      id       = data.value,
       property = data.property
       changes  = data.changes;
 
-  var variable = Syc.objects[id];
-
-  if (variable === undefined)
-    console.warn("Received changes to an unknown object: " + id);
-
+  var variable = Syc.objects[id],
+      oldValue = variable[property],
+      description = Describe(variable[property]);
+  
+  if (variable === undefined) {
+    console.warn("Received changes to an unknown object: " + id + ". Resyncing client.");
+    Reset(Socket);
+  }
+  
   if (variable['syc-one-way'] === true) { 
     console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
-    Emit('syc-object-sync', {id: id, description: Describe_Properties(variable)}, [socket])
+    Resync(type, id, property, description, socket);
   }
 
-  var old_value = variable[property];
+  var simulations = [];
 
-  if (type === 'delete')
-    var change = {result: undefined};
-  else
-    var change = {result: Apply_Changes(changes, type)};
-
-  var verified = Awake_Verifier(change, variable, property, type, old_value, socket);
+  var simulated_root = Simulate_Changes(changes, simulations); 
+  var change = {change: simulated_root};
+  var verified = Awake_Verifier(change, variable, property, type, oldValue, socket);
 
   if (verified) { 
-    if (observable) observe_lock[id] = true;
+    Change_Property(type, variable, property, change.change);
 
-    variable[property] = change.result;
+    var description = Describe_Simulation(variable[property]);
 
-    Map_Object(variable);
+    Detect_Changes(variable, property, data.changes, simulations, socket);
 
-    Awake_Watchers(variable, property, type, old_value, socket);
-    
-    var description = Describe_Properties(variable[property], variable, property);
+    Broadcast('syc-object-change', { value: id, type: type, property: property, changes: description }, socket);
 
-    if (description.type === changes.type || description.value === changes.value)
-      Broadcast('syc-object-change', {type: type, id: id, property: property, changes: description}, socket);
-    else
-      Broadcast('syc-object-change', {type: type, id: id, property: property, changes: description});
-
+    Awake_Watchers(variable, property, type, oldValue, socket);
   } else {
-    Emit('syc-object-sync', {id: id, description: Describe_Recursive(variable)}, [socket])
+    Resync(type, id, property, description, socket);
   }
-}
 
-function Apply_Changes (changes) { 
-  var type = changes.type,
-      variable,
-      properties,
-      value,
-      id;
-   
-  if (Recurrable(type)) { 
-    properties = changes.properties,
-    id         = changes.id;
 
-    if (id in Syc.objects) { 
-      var object = Syc.objects[id];
-      if (object['syc-one-way']) { 
-        console.warn('Syc warning: A client\'s attempted to reference a one-way variable from a two-way variable. Ignoring client request.');
+  function Describe_Simulation (variable) {
+    var type = Type(variable),
+        value = Evaluate(type, variable);
+
+    if (type === 'object' || type === 'array') {
+      var id = value;
+
+      if (id in Syc.objects) {
+        return {type: type, value: value}
       } else {
-        return object;
+        var properties = {}
+
+        for (var property in variable) {
+          properties[property] = Describe_Simulation(variable[property]);
+        }
+
+        Meta(variable, false, id);
+
+        return {type: type, value: id, properties: properties}
+      }
+    } else {
+      return {type: type, value: value}
+    }
+  }
+
+  function Detect_Changes (root, property, changes, objects, socket) {
+    var id = root['syc-object-id'],
+        type = Type(root[property]),
+        value = Evaluate(type, root[property]);
+        
+    if (type !== changes.type || value !== changes.value) {
+      var changes = {type: type, value: value}
+
+      var data = {value: id, type: 'update', property: property, changes: changes }
+
+      Emit('syc-object-change', data, [socket]);
+    }
+
+    objects.forEach( function (object) {
+      var id = object['syc-object-id'];
+      
+      observe_redirect[id] = socket;
+      
+      Detect_Deletions(object);
+      for (var property in object) {
+        Detect_Modifications(object, property);
+      }
+
+      delete observe_redirect[id];
+    });
+  }
+
+  function Change_Property (type, object, property, value) {
+    var id = object['syc-object-id'];
+
+    observe_lock[id] = true;
+
+    if (type === 'delete') {
+      if (object[property]) {
+        delete object[property];
+      } else {
+        observe_lock[id] = false;
+      }
+    } else if (type === 'add' || type === 'update') {
+      object[property] = value;
+    } else {
+      console.error('Syc error: Received changes for an unknown change type: ' + type);
+    }
+
+    Map_Property(object, property);
+  }
+
+  function Resync (type, id, property, description, socket) {
+    var description = Describe(variable[property], variable, property);
+
+    if (type === 'add') {
+      Emit('syc-object-change', {type: 'delete', value: id, property: property}, [socket]);
+    } else if (type === 'delete') {
+      Emit('syc-object-change', {type: 'add', value: id, property: property, changes: description}, [socket]);
+    } else if (type === 'update') {
+      Emit('syc-object-change', {type: 'update', value: id, property: property, changes: description}, [socket]);
+    }
+  }
+
+  function Simulate_Changes (changes, simulated_objects) { 
+    var type = changes.type,
+        variable,
+        properties,
+        value,
+        id;
+   
+    if (Recurrable(type)) { 
+      properties = changes.properties,
+      id         = changes.value;
+
+      if (id in Syc.objects) { 
+        var object = Syc.objects[id];
+        if (object['syc-one-way']) { 
+          console.warn('Syc warning: A client\'s attempted to reference a one-way variable from a two-way variable. Ignoring client request.');
+        } else {
+          return object;
+        }
+      } else { 
+        if (type === 'object') variable = {};
+        if (type === 'array') variable = [];
+
+        Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
+
+        for (var property in properties) {
+          variable[property] = Simulate_Changes(properties[property], simulated_objects);
+        }
+ 
+        var map = Map_Object(variable);
+
+        simulated_objects.push(variable); 
+
+        return variable;
       }
     } else { 
-      if (type === 'object') variable = {};
-      if (type === 'array') variable = [];
-
-      for (property in properties) {
-        variable[property] = Apply_Changes(properties[property])
-      }
-
-      id = Meta(variable, false, id);
-
-      Map_Object(variable);
-
-      return variable;
+      value = changes.value;
+      return Evaluate(type, value);
     }
-  } else { 
-    value = changes.value;
-    return Evaluate(type, value);
   }
 }
+
+
 
 
 // ---- ---- ---- ----  Object Conversion  ----- ---- ---- ---- 
-function Meta (variable, one_way,  id) {
-  if (variable['syc-object-id']) { console.error("Already Existing object") };
+function Meta (variable, one_way, foreign_id) {
+  var id = foreign_id || token();
 
-  var id = id || token();
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
 
-  if (one_way) { 
+  if (one_way)
     Object.defineProperty(variable, 'syc-one-way', {value: true, enumerable: false});
-  }
- 
+  
   Syc.objects[id] = variable;
-
+ 
   if (observable) Object.observe(variable, Observed);
   
   function token () { 
@@ -445,12 +507,16 @@ function Reset (socket) {
 
   Emit('syc-reset-command', {}, [socket]);
 
-  for (name in Syc.variables) {
+  for (var name in Syc.variables) {
     var id = Syc.variables[name],
         variable = Syc.objects[id];
 
-    Emit('syc-variable-new', {name: name, id: id, description: Describe_Recursive(variable)}, [socket]);
+    Emit('syc-variable-new', {name: name, value: id, description: Describe_Recursive(variable)}, [socket]);
   }
+}
+
+function Handshake (socket) {
+  Emit('syc-welcome', {}, [socket]);
 }
 
 
@@ -467,17 +533,17 @@ function Verify(variable_name, func) {
   verifiers[variable_name] = func;
 }
 
-function Awake_Verifier (change, variable, property, change_type, old_value, socket) {
+function Awake_Verifier (change, variable, property, change_type, oldValue, socket) {
   var id = variable['syc-object-id'],
       verification = true;
   
   change.variable = variable;
   change.property = property;
   change.change_type = change_type;
-  change.old_value = old_value;
+  change.oldValue = oldValue;
 
   // TODO: This only accounts for the first variable to traverse onto this object
-  for (name in verifiers) {
+  for (var name in verifiers) {
     if (name in object_paths) {
       if (id in object_paths[name]) {
         var verifier = verifiers[name];
@@ -494,7 +560,7 @@ function Awake_Verifier (change, variable, property, change_type, old_value, soc
 }
 
 
-function Awake_Watchers (variable, property, change_type, old_value, socket) { 
+function Awake_Watchers (variable, property, change_type, oldValue, socket) { 
   var id = variable['syc-object-id'];
 
   var change = {};
@@ -502,10 +568,11 @@ function Awake_Watchers (variable, property, change_type, old_value, socket) {
   change.variable = variable;
   change.property = property;
   change.change_type = change_type;
-  change.old_value = old_value;
+  change.oldValue = oldValue;
+  change.change = change.variable[change.property];
 
   // TODO: This only accounts for the first variable to traverse onto this object
-  for (name in watchers) { 
+  for (var name in watchers) { 
     if (name in object_paths) { 
       if (id in object_paths[name]) { 
         change.paths = Path(id, name);
@@ -526,7 +593,7 @@ function Path (target_id, variable_name) {
   var origin = Syc.objects[Syc.variables[variable_name]],
       paths = object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
 
-  for (path_number in paths) { 
+  for (var path_number in paths) { 
     var path = paths[path_number];
     
     var hidden = Hidden_Paths(path, origin, variable_name);
@@ -576,37 +643,48 @@ function Map_Object (variable) {
 
   object_map[id] = []; // Reset the mapping
 
-  for (property in variable) { 
+  for (var property in variable) { 
     var type = Type(variable[property]),
         value = Evaluate(type, variable[property]);
 
     object_map[id][property] = {type: type, value: value};
   }
+
+  return object_map[id];
+}
+
+function Map_Property (variable, property) {
+  var id = variable['syc-object-id'],
+      type = Type(variable[property]),
+      value = Evaluate(type, variable[property]);
+
+  object_map[id][property] = {type: type, value: value};
 }
 
 var visited = {};
 var hash_timer = 0;
 
 function Traverse () { 
-  for (obj in Syc.objects) { 
-    visited[obj] = false;
+  for (var id in Syc.objects) { 
+    visited[id] = false;
+    console.log(id);
   }
 
   // Start the recursion
-  for (name in Syc.variables) { 
+  for (var name in Syc.variables) { 
     object_paths[name] = {};
     Map(Syc.objects[Syc.variables[name]], name);
   }
 
   // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
-  for (obj in visited) { 
+  for (var obj in visited) { 
     if (!(visited[obj])) { 
       delete Syc.objects[obj];
     }
   }
 
   // Integrity check
-  for (sid in reset_counter) {
+  for (var sid in reset_counter) {
     if (reset_counter[sid] > 0) reset_counter[sid] -= 1;
     else delete reset_counter[sid];
   }
@@ -629,8 +707,8 @@ function Map (variable, name, path) {
   var proceed = Per_Object(variable, id, name, path);
 
   if (proceed) {
-    for (property in variable) {
-      var recur = Per_Property(variable, property, id);
+    for (var property in variable) {
+      var recur = Detect_Modifications(variable, property, id);
 
       if (recur) {
         path.push(property)
@@ -645,6 +723,7 @@ function Map (variable, name, path) {
 
 function Per_Object (variable, id, name, path) { 
   if (visited[id]) { 
+    console.log(id, 'haha');
     object_paths[name][id].push(path.slice(0));
     return false;
   } else { 
@@ -652,23 +731,29 @@ function Per_Object (variable, id, name, path) {
     object_paths[name][id] = [path.slice(0)];
   }
 
-  var map = object_map[id];
-
-  for (property in map) {
-    if (!(property in variable)) { 
-      Observer(property, variable, 'delete', map[property]);
-    }
-  }
+  Detect_Deletions(variable);
 
   return true;
 }
 
-function Per_Property (variable, name, variable_id) { 
+function Detect_Deletions(variable) {
+  var id = variable['syc-variable-id'],
+      map = object_map[id];
+
+  for (var property in map) {
+    if (!(property in variable)) { 
+      Observer(property, variable, 'delete', map[property]);
+    }
+  }
+}
+
+function Detect_Modifications (variable, name) { 
   var property = variable[name],
+      id = variable['syc-object-id'],
       type = Type(property),
       value = Evaluate(type, property);
 
-  var map = object_map[variable_id][name];
+  var map = object_map[id][name];
 
   if (map === undefined) {
     Observer(name, variable, 'add');
@@ -698,14 +783,14 @@ function Per_Property (variable, name, variable_id) {
   return false; 
 }
 
-function Observer (name, object, type, old_value) { 
+function Observer (name, object, type, oldValue) { 
   var changes = {name: name, object: object, type: type};
 
-  if (old_value) { 
-    if (old_value.type === 'array' || old_value.type === 'object') { 
-      changes.old_value = Syc.objects[old_value.value];
+  if (oldValue) { 
+    if (oldValue.type === 'array' || oldValue.type === 'object') { 
+      changes.oldValue = Syc.objects[oldValue.value];
     } else {
-      changes.old_value = old_value;
+      changes.oldValue = oldValue;
     }
   }
 
@@ -715,7 +800,7 @@ function Observer (name, object, type, old_value) {
 function Generate_Hash () {
   var hash = 0;
 
-  for (object in object_map) {
+  for (var object in object_map) {
     var stringified = JSON.stringify(object_map[object]);
     hash += HashCode(stringified);
   }
@@ -725,7 +810,7 @@ function Generate_Hash () {
   function HashCode (string) {
     var hash = 0, i, chr, len;
     if (string.length == 0) return hash;
-    for (i = 0, len = string.length; i < len; i++) {
+    for (var i = 0, len = string.length; i < len; i++) {
       chr   = string.charCodeAt(i);
       hash  = ((hash << 5) - hash) + chr;
       hash |= 0; // Convert to 32bit integer

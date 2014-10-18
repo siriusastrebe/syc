@@ -191,16 +191,11 @@ var Syc = {
         return;
       }
 
-      console.log("Observed...");
-
       var changes = Syc.Describe(changed, object, property);
-      console.log("a");
 
       Syc.Map_Object(object);
-      console.log("b");
 
       Syc.Awake_Watchers(true, object, property, type, oldValue);
-      console.log("c");
 
       Syc.Socket.emit('syc-object-change', { value: id, type: type,  property: property, changes: changes });
     }
@@ -385,8 +380,8 @@ var Syc = {
   Traverse: function () { 
     var visited = {};
  
-    for (var obj in Syc.objects) { 
-      visited[obj] = false;
+    for (var id in Syc.objects) { 
+      visited[id] = false;
     }
 
     // Start the recursion
@@ -396,9 +391,10 @@ var Syc = {
     }
 
     // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
-    for (var obj in visited) { 
-      if (!(visited[obj])) { 
-        delete Syc.objects[obj];
+    for (var id in visited) { 
+      if (!(visited[id])) { 
+        delete Syc.objects[id];
+        delete Syc.object_map[id];
       }
     }
 

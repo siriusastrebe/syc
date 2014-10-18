@@ -282,7 +282,7 @@ function Receive_Change (data, socket) {
     console.warn("Received changes to an unknown object: " + id + ". Resyncing client.");
     Reset(Socket);
   }
-  
+
   if (variable['syc-one-way'] === true) { 
     console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
     Resync(type, id, property, description, socket);
@@ -305,6 +305,7 @@ function Receive_Change (data, socket) {
 
     Awake_Watchers(variable, property, type, oldValue, socket);
   } else {
+    Destroy_Simulation(simulations);
     Resync(type, id, property, description, socket);
   }
 
@@ -391,6 +392,14 @@ function Receive_Change (data, socket) {
     } else if (type === 'update') {
       Emit('syc-object-change', {type: 'update', value: id, property: property, changes: description}, [socket]);
     }
+  }
+
+  function Destroy_Simulation (simulations) {
+    simulations.forEach( function (object) {
+      var id = object['syc-object-id'];
+
+      delete object_map[id];
+    });
   }
 
   function Simulate_Changes (changes, simulated_objects) { 
@@ -571,6 +580,10 @@ function Awake_Watchers (variable, property, change_type, oldValue, socket) {
   change.oldValue = oldValue;
   change.change = change.variable[change.property];
 
+  // TODO: This is shamefully inefficient to traverse on every watcher check
+  Traverse();
+
+
   // TODO: This only accounts for the first variable to traverse onto this object
   for (var name in watchers) { 
     if (name in object_paths) { 
@@ -667,7 +680,6 @@ var hash_timer = 0;
 function Traverse () { 
   for (var id in Syc.objects) { 
     visited[id] = false;
-    console.log(id);
   }
 
   // Start the recursion
@@ -677,9 +689,10 @@ function Traverse () {
   }
 
   // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
-  for (var obj in visited) { 
-    if (!(visited[obj])) { 
-      delete Syc.objects[obj];
+  for (var id in visited) { 
+    if (!(visited[id])) { 
+      delete Syc.objects[id];
+      delete object_map[id];
     }
   }
 
@@ -723,7 +736,6 @@ function Map (variable, name, path) {
 
 function Per_Object (variable, id, name, path) { 
   if (visited[id]) { 
-    console.log(id, 'haha');
     object_paths[name][id].push(path.slice(0));
     return false;
   } else { 

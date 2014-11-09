@@ -72,9 +72,10 @@ Occasionally, you'll want to be notified when changes are made to you variable.
     
     syc.watch(object, alertMe, {remote: true, local: true, recursive: false})
 
-This pops up a console message every time you receive a remote change to the object.
+This pops up a console message every time you receive a local or remote change to the object.
 
-If do a watch recursively, it will automatically make watch any new children object/arrays, and remove watchers from objects no longer descending from the object.
+The preferences argument can be ommitted, with `remote` and `local` defaulting to `true` and `recursive` to `false`. 
+If recursive is true, all descendants will be watched. Any new children object/arrays created after the watcher will automatically be given a trigger for the same function. Objects that whose references were deleted after the watcher was created will automatically be unwatched.
 
 Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
 
@@ -101,7 +102,7 @@ You can unwatch an existing watcher:
 
     syc.unwatch(func)
     syc.unwatch(func, object)
-    
+
 Object is an optional parameter. If its left blank, then all watcher that utilizes the function will be deleted.
 
 ## Verifiers (Server side)

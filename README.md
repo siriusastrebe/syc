@@ -36,6 +36,7 @@ You can also provide an existing object or array as a base for your Syc variable
 
     var obj = {a: 'a', b: 'b'}
     Syc.sync('name', obj)
+    obj.c = 'c';
 
 ## Setting up Syc
 

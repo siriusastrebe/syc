@@ -70,9 +70,11 @@ Occasionally, you'll want to be notified when changes are made to you variable.
         console.log(change);
     }
     
-    syc.watch('name', alertMe, {remote: true, local: true})
+    syc.watch(object, alertMe, {remote: true, local: true, recursive: false})
 
-This pops up a console message every time you receive a remote change to an object bound to the variable 'name'. Ommitting the preferences argument will default to the watcher triggering on both remote and local changes.
+This pops up a console message every time you receive a remote change to the object.
+
+If do a watch recursively, it will automatically make watch any new children object/arrays, and remove watchers from objects no longer descending from the object.
 
 Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
 
@@ -94,6 +96,13 @@ Watchers provide insight into an object whose property has been changed. If mult
 `change.local`, `change.remote` One of these will be true depending on the origin of the change.
 
 *Note:* Server side watchers have access to the originating socket `function (changes, socket)`
+
+You can unwatch an existing watcher:
+
+    syc.unwatch(func)
+    syc.unwatch(func, object)
+    
+Object is an optional parameter. If its left blank, then all watcher that utilizes the function will be deleted.
 
 ## Verifiers (Server side)
 

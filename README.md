@@ -15,7 +15,7 @@ To sync a variable from the server to the client:
 
     // On the server side...
     var synced = new syc.sync('name')
-    synced['hello'] = 'world';
+    synced.hello = 'world';
     
 The client can use `syc.list()` to see all existing syc variables.
 
@@ -34,9 +34,9 @@ You can change the data on either the server or the client... And see the change
     
 You can also provide an existing object or array as a base for your Syc variable:
 
-    var obj = {a: 'a', b: 'b'}
-    Syc.sync('name', obj)
-    obj.c = 'c';
+    var list = ['a', 'b', 'c']
+    Syc.sync('name', list)
+    list.push('d');
 
 ## Setting up Syc
 
@@ -121,9 +121,16 @@ You can have multiple watchers on the same variable, but only one verifier per i
 
 *Hint*: `change.change` can be modified within the verifying function and whatever value contained in it when the verifier returns will be used. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, and modifications to change.result will reflect even if the verifier returns false.
 
+
+## Paths (Client and Server Side)
+
+    Syc.Paths(source, destination) 
+
+This is a built in function that will do a DFS that will find all list of paths from one object to another. Cycles are only counted the first time.
+
 - - - 
 This library is a work in progress.
 
-Planned features: Groups (Still in planning).
+Planned features: Groups (Still in planning). This feature would provide security and selective data sharing for clients.
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind. Try it!

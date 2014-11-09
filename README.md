@@ -1,9 +1,9 @@
 Syc
 ===
 
-Change a variable on your node.js server, and see that same change reflected on your clients' browsers.
+Create and synchronize any data as a javascript object, from your server to your clients and back again.
 
-When you create a Syc variable, an identical variable will appear on the client side. Changes to this variable will be communicated and updated via socket.io instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
+When you create a Syc variable on the server side, an identical variable will appear on the client side. Changes to this variable will be communicated and updated via socket.io instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
 
 Like Meteor, but without the framework.
 
@@ -31,6 +31,11 @@ You can change the data on either the server or the client... And see the change
     // elsewhere...
     synced.goodbye
     -> "farewell!"
+    
+You can also provide an existing object or array as a base for your Syc variable:
+
+    var obj = {a: 'a', b: 'b'}
+    Syc.sync('name', obj)
 
 ## Setting up Syc
 
@@ -48,9 +53,9 @@ And on the client:
 
     // Client side setup
     var socket = io.connect();
-    Syc.connect(socket);
+    Syc.connect(socket, callback);
 
-Now syc will be able to sync variables with this client.
+Now syc will be able to sync variables with this client. The callback will be called after Syc has connected and received up to date data.
 
 ## One-way Variables (Server side)
 
@@ -60,7 +65,6 @@ Now syc will be able to sync variables with this client.
 Serving a variable restricts the client from making any changes to data bound to the served variable. Useful for when you do not want a malicious client to tampering with the data. 
 
 *Note*: To ensure good practice, Syc forbids one-way served variables from referencing or being referenced by two-way variables.
-
 
 ## Watchers (Client and Server Side)
 
@@ -72,7 +76,7 @@ Occasionally, you'll want to be notified when changes are made to you variable.
     
     syc.watch('name', alertMe, {remote: true, local: true})
 
-This every time you receive a remote change to an object bound to the variable 'name'. Ommitting the preferences argument will default to the watcher triggering on both remote and local changes.
+This pops up a console message every time you receive a remote change to an object bound to the variable 'name'. Ommitting the preferences argument will default to the watcher triggering on both remote and local changes.
 
 Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
 
@@ -81,7 +85,7 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 `change.variable` - The variable whose property was modified.
 
-`change.property` - The modified property name. The actual changed value can be found in `change.variable[change.property]`.
+`change.property` - The modified property's name. The actual changed value can be found in `change.variable[change.property]`.
 
 `change.change` - The actual changed value, shorthand for `change.variable[change.property]`
 
@@ -89,18 +93,18 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 `change.oldValue` - A record of the previous value held in `change.variable[change.property]`.
 
-`change.change_type` - Any one of `add`, `update` or `delete`.
+`change.type` - Any one of `add`, `update` or `delete`.
 
-`change.paths` - This is a 2-dimensional list. Each inner list is a full path from the root of the syc variable to the location of the change. Cycles are only counted once.
+`change.local`, `change.remote` One of these will be true depending on the origin of the change.
 
 *Note:* Server side watchers have access to the originating socket `function (changes, socket)`
 
 ## Verifiers (Server side)
 
-While watchers are good for alerting changes after they happen, often you'll want to verify that a change is harmless before it takes effect. Verifiers look similar to watchers, but `change` has an additional property `result`.
+While watchers are good for alerting changes after they happen, often you'll want to verify that a change is harmless before it takes effect. Verifiers look similar to watchers, but will accept a change only if the function returns true.
 
     function check (change, socket) {
-      if (typeof change.result !== 'string') 
+      if (typeof change.change !== 'string') 
         return false;
       else
         return true;
@@ -108,19 +112,17 @@ While watchers are good for alerting changes after they happen, often you'll wan
     
     Syc.verify('name', check)
 
-By its nature, verifiers are only triggered on receiving a change from a client.
+By its nature, verifiers are only triggered on receiving a remote change originating from a client.
 
 When a client makes a change, verifiers will be called *before* the change happens. If the verifier returns a truthy value, the change is accepted and then any watchers will be called. If falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
 You can have multiple watchers on the same variable, but only one verifier per instance of Syc.sync().
 
-`change.result` can be modified within the verifying function and whatever value contained in change.result when the verifier returns will be used. **Warning**: change.result sometimes can reference an existing object, and modifications to change.result will reflect even if the verifier returns false.
-
-
+*Hint*: `change.change` can be modified within the verifying function and whatever value contained in it when the verifier returns will be used. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, and modifications to change.result will reflect even if the verifier returns false.
 
 - - - 
 This library is a work in progress.
 
-Planned features: , Groups (Still in discussion).
+Planned features: Groups (Still in planning).
 
-Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Try it!
+Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind. Try it!

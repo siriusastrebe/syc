@@ -7,7 +7,7 @@ When you create a Syc variable on the server side, an identical variable will ap
 
 Like Meteor, but without the framework.
 
-Syc uses Object.observe if it's available for immediate responsiveness and performance, but will easily fall back onto a polyfill for older clients or Node instances without --harmony.
+Syc uses Object.observe if it's available for immediate responsiveness and performance, but will easily fall back onto a polyfill for older clients or Node instances.
 
 ## Syncing a variable (Server side)
 

@@ -14,29 +14,23 @@ Syc uses Object.observe if it's available for immediate responsiveness and perfo
 To sync a variable from the server to the client:
 
     // On the server side...
-    var synced = new syc.sync('name')
-    synced.hello = 'world';
+    var shared = {hello: 'world'}
+    syc.sync('name', shared);
     
 The client can use `syc.list()` to see all existing syc variables.
 
     // On the client side...
-    var synced = syc.list('name')
-    synced.hello
+    var shared = syc.list('name')
+    shared.hello
     -> "world"
     
 You can change the data on either the server or the client... And see the change reflected everywhere else.    
 
-    synced.goodbye = "farewell!"
+    shared.goodbye = "farewell!"
 
     // elsewhere...
-    synced.goodbye
+    syc.list('name').goodbye
     -> "farewell!"
-    
-You can also provide an existing object or array as a base for your Syc variable:
-
-    var list = ['a', 'b', 'c']
-    Syc.sync('name', list)
-    list.push('d');
 
 ## Setting up Syc
 
@@ -60,8 +54,9 @@ Now syc will be able to sync variables with this client. The callback will be ca
 
 ## One-way Variables (Server side)
 
-    // Server side 
-    var served = new syc.serve('name');
+    // Server side
+    var served;
+    syc.serve('name', served);
 
 Serving a variable restricts the client from making any changes to data bound to the served variable. Useful for when you do not want a malicious client to tampering with the data. 
 

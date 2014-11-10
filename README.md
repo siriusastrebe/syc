@@ -127,11 +127,19 @@ You can have multiple watchers on the same variable, but only one verifier per i
 *Hint*: `change.change` can be modified within the verifying function and whatever value contained in it when the verifier returns will be used. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, and modifications to change.result will reflect even if the verifier returns false.
 
 
-## Paths (Client and Server Side)
+## Helper Functions (Client and Server Side)
 
     Syc.Paths(source, destination) 
 
-This is a built in function that will do a DFS that will find all list of paths from one object to another. Cycles are only counted the first time.
+Returns a nested list of the list of property names from one object to another.
+
+    Syc.Ancestors(object)
+
+Returns a list of ancestors
+
+    Syc.Type(value)
+    
+The built in function Syc uses to determine the variable type of a value.
 
 - - - 
 This library is a work in progress.

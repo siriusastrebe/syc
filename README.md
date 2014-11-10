@@ -124,22 +124,7 @@ When a client makes a change, verifiers will be called *before* the change happe
 
 You can have multiple watchers on the same variable, but only one verifier per instance of Syc.sync().
 
-*Hint*: `change.change` can be modified within the verifying function and whatever value contained in it when the verifier returns will be used. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, and modifications to change.result will reflect even if the verifier returns false.
-
-
-## Helper Functions (Client and Server Side)
-
-    Syc.Paths(source, destination) 
-
-Returns a nested list of the list of property names from one object to another.
-
-    Syc.Ancestors(object)
-
-Returns a list of ancestors
-
-    Syc.Type(value)
-    
-The built in function Syc uses to determine the variable type of a value.
+*Note*: `change.change` can be modified by the callback for the verifying function and whatever value `change.change` contains when the verifier returns will be used. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, changes will reflect even on that object even if the verifier returns false.
 
 - - - 
 This library is a work in progress.

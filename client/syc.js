@@ -12,6 +12,7 @@ var Syc = {
     Syc.handshake_callback = callback;
   },
 
+  List: function (argument) { return Syc.list(argument) },
   list: function (name) {
     if (name === undefined) { 
       var all = {}
@@ -25,28 +26,34 @@ var Syc = {
     }
   },
 
-  List: function (argument) { return Syc.list(argument) },
+  watch: function (object, func, preferences) { 
+    Syc.Watch(object, func, preferences);
+  },
 
-  watch: function (variable_name, func, preferences) { Syc.Watch(variable_name, func, preferences) },
+  unwatch: function (func, object) {
+    Syc.Unwatch(func, object);
+  },
 
   variables: {},
   objects: {},
 
   polyfill_interval: 260,
 
-  generalWatchers: {},
-  localWatchers: {},
-  remoteWatchers: {},
+  watchers: {},
 
   observe_lock: {},
   object_map: {},
-  object_paths: {},
 
   handshake_callback: undefined,
 
   observable: !!Object.observe,
 
-  /* ---- ---- ---- ----  New Variables  ---- ---- ---- ---- */
+
+  /* ---- ---- ---- ----  Setting up  ---- ---- ---- ----  */
+  Handshake: function (data) {
+    Syc.handshake_callback();
+  },
+
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
   Receive_Message: function (messages) { 
     messages.forEach( function (message) { 
@@ -82,11 +89,6 @@ var Syc = {
 
     var variable = Syc.Resolve(description);
   },
-
-  Handshake: function (data) {
-    Syc.handshake_callback();
-  },
-
 
   Receive_Change: function (data) { 
     var type        = data.type,
@@ -169,10 +171,11 @@ var Syc = {
 
   Reset: function (data) {
     Syc.objects = {};
+    Syc.object_map = {};
     Syc.variables = {};
   },
 
-  // ---- ---- ---- ----  Observing  ---- ---- ---- ----
+  // ---- ---- ---- ----  Observing & Tracking Changes  ---- ---- ---- ----
   Observed: function (changes) { 
     for (var change in changes) { 
       var object = changes[change].object,
@@ -193,7 +196,7 @@ var Syc = {
 
       var changes = Syc.Describe(changed, object, property);
 
-      Syc.Map_Object(object);
+      Syc.Map_Property(object, property);
 
       Syc.Awake_Watchers(true, object, property, type, oldValue);
 
@@ -263,22 +266,143 @@ var Syc = {
   },
 
 
-  // ---- ---- ---- ----  Watchers  ---- ---- ---- ---- 
-  Watch: function (variable_name, func, preferences) { 
-    var local = true,
-        remote = true;
+  Ancestors: function (variable, visited, objects) {
+    var id = variable['syc-object-id'],
+        visited = visited || {},
+        objects = objects || [];
 
-    if (preferences) {
-      local = preferences.local !== false;
-      remote = preferences.remote !== false;
+    if (visited[id]) 
+      return;
+    else
+      visited[id] = true;
+
+    objects.push(variable);
+
+    for (var property in variable) {
+      var type = Syc.Type(variable[property]);
+
+      if (type === 'object' || type === 'array') 
+        Syc.Ancestors(variable[property], visited, objects);
     }
 
-    if (local && remote) {
-      (Syc.generalWatchers[variable_name] = Syc.generalWatchers[variable_name] || []).push(func);
-    } else if (local) {
-      (Syc.localWatchers[variable_name] = Syc.localWatchers[variable_name] || []).push(func);
-    } else if (remote) { 
-      (Syc.remoteWatchers[variable_name] = Syc.remoteWatchers[variable_name] || []).push(func);
+    return objects;
+  },
+  
+
+  // ---- ---- ---- ----  Watchers  ---- ---- ---- ---- 
+  Watch: function (object, func, preferences) { 
+    var local = true,
+        remote = true,
+        recursive = false,
+        id = object['syc-object-id'];
+
+
+    if (preferences) {
+      if (preferences.local && preferences.remote) {
+        local = true; remote = true;
+      } else if (preferences.local || preferences.remote === false) {
+        local = true; remote = false;
+      } else if (preferences.remote || preferences.local === false) { 
+        local = false; remote = true;
+      }
+      if (preferences.remote === false && preferences.local === false) 
+        return;
+
+      recursive = preferences.recursive || false;
+    }
+
+    var identifier = Syc.Hash_Code(String(func));
+    
+    Syc.watchers[id] = (Syc.watchers[id] || {});
+    Syc.watchers[id][identifier] = Wrapper;
+
+    if (recursive) {
+      var ancestors = Syc.Ancestors(object);
+      ancestors.forEach ( function (object) { 
+        var id = object['syc-object-id'];
+
+        Syc.watchers[id] = (Syc.watchers[id] || {});
+        Syc.watchers[id][identifier] = Wrapper;
+      });
+    }
+
+    function Wrapper (change) { 
+      if (local && !remote) { 
+         Local_Only(change);
+      } else if (remote && !local) { 
+         Remote_Only(change);
+      } else if (remote && local) {
+         Both(change);
+      }
+
+      if (recursive) {
+        Recursive(change);
+      }
+    }
+
+    function Local_Only (change) { 
+      if (change.local && !change.remote) {
+        func(change);
+      }
+    }
+
+    function Remote_Only (change) { 
+      if (change.remote && !change.local) {
+        func(change);
+      }
+    }
+
+    function Both (change) { 
+      if (change.remote || change.local) { 
+        func(change);
+      }
+    }
+
+    function Recursive (change) {
+      var old_value = change.oldValue,
+          old_type = Syc.Type(old_value),
+          new_value = change.change,
+          new_type = Syc.Type(new_value);
+
+      if (old_type === 'array' || old_type === 'object') { 
+        var ancestors = Syc.Ancestors(old_value);
+
+        ancestors.forEach( function (object) { 
+          var id = object['syc-object-id'];
+
+          delete Syc.watchers[id][identifier];
+        });
+      }
+
+      if (new_type === 'array' || new_type === 'object') {
+        var ancestors = Syc.Ancestors(new_value);
+
+        ancestors.forEach( function (object) { 
+          var id = object['syc-object-id'];
+
+          Syc.watchers[id] = (Syc.watchers[id] || {});
+          Syc.watchers[id][identifier] = Wrapper;
+        });
+      }
+    }
+  },
+
+  Unwatch: function (func, object) {
+    var identifier = Syc.Hash_Code(String(func));
+
+    if (object) {
+      var id = object['syc-object-id'];
+
+      Remove (id, identifier);
+    } else {
+      for (id in Syc.watchers) { 
+        Remove (id, identifier);
+      }
+    }
+
+    function Remove (id, identifier) { 
+      if (Syc.watchers[id][identifier])
+        delete Syc.watchers[id][identifier];
     }
   },
 
@@ -289,38 +413,17 @@ var Syc = {
 
     change.variable = variable;
     change.property = property;
-    change.change_type = type;
+    change.type = type;
     change.oldValue = oldValue;
     change.change = change.variable[change.property];
+    change.local = local;
+    change.remote = !local;
 
-    // TODO: This is shamefully inefficient to traverse on every watcher check
-    Syc.Traverse();
-
-    // TODO: This only accounts for the first variable to traverse onto this object
-    if (local) {
-      Find_Watchers(Syc.localWatchers);
-    } else {
-      Find_Watchers(Syc.remoteWatchers);
-    }
-
-    Find_Watchers(Syc.generalWatchers);
-
-    function Find_Watchers (list) {
-      for (var name in list) {
-
-        if (name in Syc.object_paths) { 
-          if (id in Syc.object_paths[name]) { 
-            change.paths = Syc.Path(id, name);
-            change.root = Syc.objects[Syc.variables[name]];
-
-            list[name].forEach( function (watcher) { 
-              watcher(change);
-            });
-          }
-        }
-      }
+    for (var identifier in Syc.watchers[id]) {
+      Syc.watchers[id][identifier](change);
     }
   },
+
 
   // ---- ---- ---- ----  Integrity Check  ---- ---- ---- ---- 
   Integrity_Check: function (data) {
@@ -339,22 +442,22 @@ var Syc = {
  
     for (var object in Syc.object_map) {
       var stringified = JSON.stringify(Syc.object_map[object]);
-      hash += HashCode(stringified);
+      hash += Syc.Hash_Code(stringified);
     }
 
     return hash;
+  },
 
-    function HashCode (string) {
-      var hash = 0, i, chr, len;
-      if (string.length == 0) return hash;
+  Hash_Code: function (string) {
+    var hash = 0, i, chr, len;
+    if (string.length == 0) return hash;
 
-      for (var i = 0, len = string.length; i < len; i++) {
-        chr   = string.charCodeAt(i);
-        hash  = ((hash << 5) - hash) + chr;
-        hash |= 0; // Convert to 32bit integer
-      }
-      return hash;
+    for (var i = 0, len = string.length; i < len; i++) {
+      chr   = string.charCodeAt(i);
+      hash  = ((hash << 5) - hash) + chr;
+      hash |= 0; // Convert to 32bit integer
     }
+    return hash;
   },
 
 
@@ -366,14 +469,20 @@ var Syc = {
   Map_Object: function (variable) { 
     var id = variable['syc-object-id'];
 
-    Syc.object_map[id] = []; // Reset the mapping
+    // Reset the mapping
+    Syc.object_map[id] = []; 
 
     for (var property in variable) { 
-      var type = Syc.Type(variable[property]),
-          value = Syc.Evaluate(type, variable[property]);
-
-      Syc.object_map[id][property] = {type: type, value: value};
+      Syc.Map_Property(variable, property);
     }
+  },
+
+  Map_Property: function (variable, property) {
+    var id = variable['syc-object-id'],
+        type = Syc.Type(variable[property]),
+        value = Syc.Evaluate(type, variable[property]);
+
+    Syc.object_map[id][property] = {type: type, value: value};
   },
 
 
@@ -386,7 +495,6 @@ var Syc = {
 
     // Start the recursion
     for (var name in Syc.variables) { 
-      Syc.object_paths[name] = {};
       Map(Syc.objects[Syc.variables[name]], name);
     }
 
@@ -398,22 +506,20 @@ var Syc = {
       }
     }
 
-    function Map (variable, name, path) {
+    function Map (variable) {
       var id = variable['syc-object-id'];
 
       if (id === undefined) throw 'Sanity Check: polyfill cannot determine object id';
       if (path === undefined) { var path = [] }
   
-      var proceed = Per_Object(variable, id, name, path);
+      var proceed = Per_Object(variable);
 
       if (proceed) { 
         for (var property in variable) {
-          var recur = Per_Property(variable, property, id);
+          var recur = Per_Property(variable, property);
   
           if (recur) { 
-            path.push(property)
             Map(variable[property], name, path);
-            path.pop();
           }
         }
 
@@ -421,13 +527,13 @@ var Syc = {
       }
     }
 
-    function Per_Object (variable, id, name, path) { 
+    function Per_Object (variable) { 
+      var id = variable['syc-object-id'];
+
       if (visited[id]) {
-        Syc.object_paths[name][id].push(path.slice(0));
         return false;
       } else {
         visited[id] = true;
-        Syc.object_paths[name][id] = [path.slice(0)];
       }
 
       var map = Syc.object_map[id];
@@ -441,12 +547,13 @@ var Syc = {
       return true;
     }
 
-    function Per_Property (variable, name, variable_id) { 
+    function Per_Property (variable, name) { 
       var property = variable[name],
           type = Syc.Type(property),
-          value = Syc.Evaluate(type, property);
+          value = Syc.Evaluate(type, property),
+          id = variable['syc-object-id'];
   
-      var map = Syc.object_map[variable_id][name];
+      var map = Syc.object_map[id][name];
   
       if (map === undefined) {
         Observer(name, variable, 'add');
@@ -493,52 +600,6 @@ var Syc = {
       Syc.Observed([changes]);
     }
   },
-
-
-  Path: function (target_id, variable_name) {
-    // This function is dependent on Traverse() having been called to update object_paths.
-
-    var origin = Syc.objects[Syc.variables[variable_name]],
-        paths = Syc.object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
-
-    for (var path_number in paths) { 
-      var path = paths[path_number];
-      
-      var hidden = Hidden_Paths(path, origin, variable_name);
-      if (hidden.length > 0) { 
-        paths.push(hidden);
-      }
-    }
-
-    return paths;
-
-
-    function Hidden_Paths(path, object, variable_name, index) { 
-      /* This fat function is necessitated by Traversals not traversing
-      down through objects that have been visited already, failing to record 
-      all possible paths to the target. */
-
-      var id = object['syc-object-id'],
-          paths = Syc.object_paths[variable_name][id];
-          index = index || 0,
-          next = object[path[index]],
-          new_paths = [];
-
-      if (paths.length > 0) { 
-
-        for (var i=1; i<paths.length; i++) { 
-          var new_path = paths[i].concat(path.slice(index));
-          new_paths.push(new_path);
-        }
-      }
-
-      if (index < path.length-1) { 
-        return new_paths.concat(Hidden_Paths(path, next, variable_name, index+1));
-      } else {
-        return new_paths;
-      }
-    }
-  }
 }
 
 var syc = Syc;

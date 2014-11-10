@@ -4,8 +4,12 @@ var observe_redirect = {};
 var object_map = {};
 var observable = !!Object.observe;
 var object_paths = {};
-var watchers = {};
+
+var generalWatchers = {};
+var localWatchers = {};
+var remoteWatchers = {};
 var verifiers = {};
+
 var buffers = [];
 
 var mapping_timer;
@@ -29,14 +33,33 @@ Syc = {
 
     if (!mapping_timer) mapping_timer = setInterval(Traverse, Syc.traversal_interval);
   },
+
+  list: function (name) {
+    if (name === undefined) { 
+      var all = {}
+      for (var variable in Syc.variables) {
+        var id = Syc.variables[variable];
+        all[variable] = Syc.objects[id];
+      }
+      return all;
+    } else {
+      return Syc.objects[Syc.variables[name]];
+    }
+  },
+
+  List: function (argument) { return Syc.list(argument) },
   
   sync: function (name, variable) {
     if (variable instanceof Syc.sync)
       var variable = this; 
     if (variable === undefined)
       var variable = {};
+    if (Type(variable) !== 'object' && Type(variable) !== 'array')
+      throw "Syc error: Can't synchronize a stand-alone variable. Use an object or an array instead."
 
     Name(name, variable);
+
+    return variable;
   },
 
   serve: function (name) {
@@ -44,6 +67,8 @@ Syc = {
       var variable = this; 
     if (variable === undefined)
       var variable = {};
+    if (Type(variable) !== 'object' && Type(variable) !== 'array')
+      throw "Syc error: Can't synchronize a stand-alone variable. Use an object or an array instead."
 
     Name(name, this, true);
   },
@@ -51,13 +76,14 @@ Syc = {
   watch: function (variable_name, func) { Watch(variable_name, func) },
   verify: function (variable_name, func) { Verify(variable_name, func) },
 
+  Type: Type,
   type: Type,
 
   variables: {},
   objects: {},
 
   polyfill_interval: 260,
-  integrity_interval: 36000,
+  integrity_interval: 10000,
   buffer_delay: 20,
   reset_limit: 8
 }
@@ -147,7 +173,6 @@ function Name (name, variable, one_way) {
    
   id = Meta(variable, one_way);
   Syc.variables[name] = id;
-  watchers[name] = [];
 
   var description = Describe_Recursive(variable);
 
@@ -174,6 +199,8 @@ function Observed (changes) {
     changes = Describe(changed, object, property);
 
     Map_Property(object, property);
+
+    Awake_Watchers(true, object, property, type, oldValue);
 
     var data = { value: id, type: type, property: property, changes: changes }
 
@@ -215,8 +242,10 @@ function Describe (variable, parent, pathname) {
 
       return {type: type, value: value, properties: properties, one_way: one_way};
     } else { 
-      var one_way = variable['syc-one-way'];
-      Variable_Compatibility(variable, parent, pathname);
+      if (parent) { 
+        var one_way = variable['syc-one-way'];
+        Variable_Compatibility(variable, parent, pathname);
+      }
 
       return {type: type, value: value, one_way: one_way};
     }
@@ -269,19 +298,22 @@ function Variable_Compatibility (variable, parent, pathname) {
 
 
 function Receive_Change (data, socket) { 
+        console.log(data)
   var type     = data.type,
       id       = data.value,
       property = data.property
       changes  = data.changes;
 
+
   var variable = Syc.objects[id],
-      oldValue = variable[property],
-      description = Describe(variable[property]);
+      oldValue = variable[property];
   
   if (variable === undefined) {
     console.warn("Received changes to an unknown object: " + id + ". Resyncing client.");
     Reset(Socket);
   }
+
+  var description = Describe(variable[property]);
 
   if (variable['syc-one-way'] === true) { 
     console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
@@ -303,7 +335,7 @@ function Receive_Change (data, socket) {
 
     Broadcast('syc-object-change', { value: id, type: type, property: property, changes: description }, socket);
 
-    Awake_Watchers(variable, property, type, oldValue, socket);
+    Awake_Watchers(false, variable, property, type, oldValue, socket);
   } else {
     Destroy_Simulation(simulations);
     Resync(type, id, property, description, socket);
@@ -530,13 +562,25 @@ function Handshake (socket) {
 
 
 // ---- ---- ---- ----  Watchers  ---- ---- ---- ----
-function Watch (variable_name, func) { 
-  if (variable_name in watchers) {
-    watchers[variable_name].push(func);
-  } else { 
-    watchers[variable_name] = [func];
+function Watch (variable_name, func, preferences) { 
+  var local = true,
+      remote = true;
+
+  if (preferences) {
+    local = preferences.local !== false;
+    remote = preferences.remote !== false;
+  }
+
+  if (local && remote) {
+    (generalWatchers[variable_name] = generalWatchers[variable_name] || []).push(func);
+  } else if (local) {
+    (localWatchers[variable_name] = localWatchers[variable_name] || []).push(func);
+  } else if (remote) { 
+    (remoteWatchers[variable_name] = remoteWatchers[variable_name] || []).push(func);
   }
 }
+
+
 
 function Verify(variable_name, func) { 
   verifiers[variable_name] = func;
@@ -569,7 +613,7 @@ function Awake_Verifier (change, variable, property, change_type, oldValue, sock
 }
 
 
-function Awake_Watchers (variable, property, change_type, oldValue, socket) { 
+function Awake_Watchers (local, variable, property, change_type, oldValue, socket) { 
   var id = variable['syc-object-id'];
 
   var change = {};
@@ -583,17 +627,27 @@ function Awake_Watchers (variable, property, change_type, oldValue, socket) {
   // TODO: This is shamefully inefficient to traverse on every watcher check
   Traverse();
 
+  if (local) {
+    Find_Watchers(localWatchers);
+  } else {
+    Find_Watchers(remoteWatchers);
+  }
 
-  // TODO: This only accounts for the first variable to traverse onto this object
-  for (var name in watchers) { 
-    if (name in object_paths) { 
-      if (id in object_paths[name]) { 
-        change.paths = Path(id, name);
-        change.root = Syc.objects[Syc.variables[name]];
+  Find_Watchers(generalWatchers);
 
-        watchers[name].forEach( function (watcher) { 
-          watcher(change, socket);
-        });
+  function Find_Watchers (list) {
+    // TODO: This only accounts for the first variable to traverse onto this object
+    for (var name in list) {
+
+      if (name in object_paths) { 
+        if (id in object_paths[name]) { 
+          change.paths = Path(id, name);
+          change.root = Syc.objects[Syc.variables[name]];
+
+          list[name].forEach( function (watcher) { 
+            watcher(change, socket);
+          });
+        }
       }
     }
   }
@@ -736,7 +790,7 @@ function Map (variable, name, path) {
 
 function Per_Object (variable, id, name, path) { 
   if (visited[id]) { 
-    object_paths[name][id].push(path.slice(0));
+   object_paths[name][id].push(path.slice(0));
     return false;
   } else { 
     visited[id] = true;

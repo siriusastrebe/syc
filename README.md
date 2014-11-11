@@ -98,9 +98,10 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 *Note:* Server side watchers have access to the originating socket `function (changes, socket)`
 
+### Unwatching
+
 You can unwatch an existing watcher:
 
-    syc.unwatch(func)
     syc.unwatch(func, object)
 
 Object is an optional parameter. If its left blank, then all watcher that utilizes the function will be deleted.

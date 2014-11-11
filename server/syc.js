@@ -5,11 +5,6 @@ var object_map = {};
 var observable = !!Object.observe;
 var object_paths = {};
 
-var generalWatchers = {};
-var localWatchers = {};
-var remoteWatchers = {};
-var verifiers = {};
-
 var buffers = [];
 
 var mapping_timer;
@@ -73,8 +68,13 @@ Syc = {
     Name(name, this, true);
   },
 
-  watch: function (variable_name, func) { Watch(variable_name, func) },
-  verify: function (variable_name, func) { Verify(variable_name, func) },
+  Watch: function (object, func, preferences) { Watch(object, func, preferences) },
+  watch: function (object, func, preferences) { Watch(object, func, preferences) },
+  Verify: function (object, func, preferences) { Verify(object, func, preferences) },
+  verify: function (object, func, preferences) { Verify(object, func, preferences) },
+
+  watchers: {},
+  verifiers: {},
 
   Type: Type,
   type: Type,
@@ -562,6 +562,208 @@ function Handshake (socket) {
 
 
 // ---- ---- ---- ----  Watchers  ---- ---- ---- ----
+function Watch (object, func, preferences) {
+  Record(object, func, preferences);
+}
+
+function Verify (object, func, preferences) {
+  if (!preferences) 
+    preferences = {}
+
+  preferences.verifier = true;
+  
+  Record(object, func, preferences);
+}
+
+function Record (object, func, preferences) { 
+  var verifier,
+      local = true,
+      remote = true,
+      recursive = false,
+      id = object['syc-object-id'];
+
+  if (preferences) {
+    if (preferences.local && preferences.remote) {
+      local = true; remote = true;
+    } else if (preferences.local || preferences.remote === false) {
+      local = true; remote = false;
+    } else if (preferences.remote || preferences.local === false) { 
+      local = false; remote = true;
+    }
+    if (preferences.remote === false && preferences.local === false) 
+      return;
+
+    recursive = preferences.recursive || false;
+   
+    verifier = preferences.verifier;
+  }
+
+  var identifier = Hash_Code(String(func));
+    
+  if (verifier) { 
+    Syc.verifiers[id] = (Syc.verifiers[id] || {});
+    Syc.verifiers[id][identifier] = Wrapper;
+  } else {
+    Syc.watchers[id] = (Syc.watchers[id] || {});
+    Syc.watchers[id][identifier] = Wrapper;
+  }
+
+  if (recursive) {
+    var ancestors = Syc.Ancestors(object);
+    ancestors.forEach ( function (object) { 
+      var id = object['syc-object-id'];
+
+      if (verifier) { 
+        Syc.verifiers[id] = (Syc.verifiers[id] || {});
+        Syc.verifiers[id][identifier] = Wrapper;
+      } else {
+        Syc.watchers[id] = (Syc.watchers[id] || {});
+        Syc.watchers[id][identifier] = Wrapper;
+      }
+    });
+  }
+
+  function Wrapper (change) { 
+    if (local && !remote) { 
+       Local_Only(change);
+    } else if (remote && !local) { 
+       Remote_Only(change);
+    } else if (remote && local) {
+       Both(change);
+    }
+
+    if (recursive) {
+      Recursive(change);
+    }
+  }
+
+  function Local_Only (change) { 
+    if (change.local && !change.remote) {
+      func(change);
+    }
+  }
+
+  function Remote_Only (change) { 
+    if (change.remote && !change.local) {
+      func(change);
+    }
+  }
+
+  function Both (change) { 
+    if (change.remote || change.local) { 
+      func(change);
+    }
+  }
+
+  function Recursive (change) {
+    var old_value = change.oldValue,
+        old_type = Syc.Type(old_value),
+        new_value = change.change,
+        new_type = Syc.Type(new_value);
+
+    if (old_type === 'array' || old_type === 'object') { 
+      var ancestors = Syc.Ancestors(old_value);
+
+      ancestors.forEach( function (object) { 
+        var id = object['syc-object-id'];
+
+        delete Syc.watchers[id][identifier];
+      });
+    }
+
+    if (new_type === 'array' || new_type === 'object') {
+      var ancestors = Syc.Ancestors(new_value);
+
+      ancestors.forEach( function (object) { 
+        var id = object['syc-object-id'];
+
+        Syc.watchers[id] = (Syc.watchers[id] || {});
+        Syc.watchers[id][identifier] = Wrapper;
+      });
+    }
+  }
+}
+
+function Unwatch (func, object) {
+  var identifier = Hash_Code(String(func));
+
+  if (object) {
+    var id = object['syc-object-id'];
+
+    Remove(id, identifier);
+  } else {
+    for (id in Syc.watchers) { 
+      Remove (id, identifier);
+    }
+  }
+
+  function Remove (id, identifier) { 
+    if (Syc.watchers[id][identifier])
+      delete Syc.watchers[id][identifier];
+  }
+}
+
+function Unverify (func, object) {
+  var identifier = Hash_Code(String(func));
+
+  if (object) {
+    var id = object['syc-object-id'];
+
+    Remove(id, identifier);
+  } else {
+    for (id in Syc.watchers) { 
+      Remove (id, identifier);
+    }
+  }
+
+  function Remove (id, identifier) { 
+    if (Syc.verifiers[id][identifier])
+      delete Syc.verifiers[id][identifier];
+  }
+}
+
+
+function Awake_Watchers (local, variable, property, type, oldValue, socket) { 
+  var id = variable['syc-object-id'];
+
+  var change = {};
+
+  change.variable = variable;
+  change.property = property;
+  change.type = type;
+  change.oldValue = oldValue;
+  change.change = change.variable[change.property];
+  change.local = local;
+  change.remote = !local;
+
+  for (var identifier in Syc.watchers[id]) {
+    Syc.watchers[id][identifier](change, socket);
+  }
+}
+
+function Awake_Verifiers (variable, property, type, oldValue, socket) { 
+  var id = variable['syc-object-id'];
+
+  var change = {};
+
+  change.variable = variable;
+  change.property = property;
+  change.type = type;
+  change.oldValue = oldValue;
+  change.change = change.variable[change.property];
+
+  for (var identifier in Syc.watchers[id]) {
+    var result = Syc.watchers[id][identifier](change, socket);
+    if (!result) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
+/*
 function Watch (variable_name, func, preferences) { 
   var local = true,
       remote = true;
@@ -652,52 +854,8 @@ function Awake_Watchers (local, variable, property, change_type, oldValue, socke
     }
   }
 }
+*/
 
-
-function Path (target_id, variable_name) {
-  // TODO: This function is dependent on Traverse() having been called to update object_paths.
-
-  var origin = Syc.objects[Syc.variables[variable_name]],
-      paths = object_paths[variable_name][target_id].slice(0); // Create a copy so we don't tamper the original.
-
-  for (var path_number in paths) { 
-    var path = paths[path_number];
-    
-    var hidden = Hidden_Paths(path, origin, variable_name);
-    if (hidden.length > 0) { 
-      paths.push(hidden);
-    }
-  }
-
-  return paths;
-
-
-  function Hidden_Paths(path, object, variable_name, index) { 
-    /* This fat function is necessitated by Traversals not traversing
-    down through objects that have been visited already, failing to record 
-    all possible paths to the target. */
-
-    var id = object['syc-object-id'],
-        paths = object_paths[variable_name][id];
-        index = index || 0,
-        next = object[path[index]],
-        new_paths = [];
-
-    if (paths.length > 0) { 
-
-      for (var i=1; i<paths.length; i++) { 
-        var new_path = paths[i].concat(path.slice(index));
-        new_paths.push(new_path);
-      }
-    }
-
-    if (index < path.length-1) { 
-      return new_paths.concat(Hidden_Paths(path, next, variable_name, index+1));
-    } else {
-      return new_paths;
-    }
-  }
-}
 
 
 // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
@@ -868,22 +1026,24 @@ function Generate_Hash () {
 
   for (var object in object_map) {
     var stringified = JSON.stringify(object_map[object]);
-    hash += HashCode(stringified);
+    hash += Hash_Code(stringified);
   }
 
   return hash;
 
-  function HashCode (string) {
-    var hash = 0, i, chr, len;
-    if (string.length == 0) return hash;
-    for (var i = 0, len = string.length; i < len; i++) {
-      chr   = string.charCodeAt(i);
-      hash  = ((hash << 5) - hash) + chr;
-      hash |= 0; // Convert to 32bit integer
-    }
-    return hash;
-  }
 }
+
+function Hash_Code (string) {
+  var hash = 0, i, chr, len;
+  if (string.length == 0) return hash;
+  for (var i = 0, len = string.length; i < len; i++) {
+    chr   = string.charCodeAt(i);
+    hash  = ((hash << 5) - hash) + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash;
+}
+
  
 
 

@@ -1,9 +1,9 @@
 Syc
 ===
 
-Create and synchronize any data as a javascript object, from your server to your clients and back again.
+Reactive javascript variables, automatically synchronized between server and client.
 
-When you create a Syc variable on the server side, an identical variable will appear on the client side. Changes to this variable will be communicated and updated via socket.io instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
+Wheny you pass a variable on the server side, an identical variable will appear on the client side. Changes to this variable will be caught by Object.observe to be communicated and updated via socket.io instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
 
 Like Meteor, but without the framework.
 
@@ -11,7 +11,7 @@ Syc uses Object.observe if it's available for immediate responsiveness and perfo
 
 ## Syncing a variable (Server side)
 
-To sync a variable from the server to the client:
+To sync a variable from the server to the client, take an object or array and pass it through Syc:
 
     // On the server side...
     var shared = {hello: 'world'}
@@ -108,7 +108,7 @@ Object is an optional parameter. If its left blank, then all watcher that utiliz
 
 ## Verifiers (Server side)
 
-While watchers are good for alerting changes after they happen, often you'll want to verify that a change is harmless before it takes effect. Verifiers look similar to watchers, but will accept a change only if the function returns true.
+While watchers are good for alerting changes after they happen, often you'll want to verify that a client's change is harmless before it takes effect. Verifiers look similar to watchers, but will accept a change only if the function returns true.
 
     function check (change, socket) {
       if (typeof change.change !== 'string') 
@@ -117,15 +117,13 @@ While watchers are good for alerting changes after they happen, often you'll wan
         return true;
     }
     
-    Syc.verify('name', check)
+    Syc.verify(object, check)
 
 By its nature, verifiers are only triggered on receiving a remote change originating from a client.
 
-When a client makes a change, verifiers will be called *before* the change happens. If the verifier returns a truthy value, the change is accepted and then any watchers will be called. If falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
+When a client makes a change, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted and then watchers will be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
-You can have multiple watchers on the same variable, but only one verifier per instance of Syc.sync().
-
-*Note*: `change.change` can be modified by the callback for the verifying function and whatever value `change.change` contains when the verifier returns will be used. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, changes will reflect even on that object even if the verifier returns false.
+*Note*: `change.change` can be altered by the callback. This change will be reflected in the final result. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, changes will reflect on that object even when the verifier returns false.
 
 - - - 
 This library is a work in progress.

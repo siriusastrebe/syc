@@ -50,7 +50,7 @@ var Syc = {
 
 
   /* ---- ---- ---- ----  Setting up  ---- ---- ---- ----  */
-  Handshake: function (data) {
+  Handshake: function () {
     Syc.handshake_callback();
   },
 
@@ -72,7 +72,7 @@ var Syc = {
       } else if (title === 'syc-reset-command') {
 	      Syc.Reset(data);
       } else if (title === 'syc-welcome') {
-        Syc.Handshake
+        Syc.Handshake()
       } else { 
         console.error("Syc error: Received a message title " + title + " which is not recognized");
       }

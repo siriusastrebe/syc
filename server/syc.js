@@ -17,9 +17,10 @@ Syc = {
     connected.push(socket);
 
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
-    socket.on('syc-reset-request', function (data) { Reset(socket), Handshake(socket) }) 
+    socket.on('syc-reset-request', function (data) { Reset(socket)}) 
 
     Reset(socket);
+    Handshake(socket);
     
     if (Object.observe)
       Syc.traversal_interval = Syc.integrity_interval;
@@ -298,7 +299,7 @@ function Variable_Compatibility (variable, parent, pathname) {
 
 
 function Receive_Change (data, socket) { 
-        console.log(data)
+  console.log(data)
   var type     = data.type,
       id       = data.value,
       property = data.property
@@ -324,7 +325,7 @@ function Receive_Change (data, socket) {
 
   var simulated_root = Simulate_Changes(changes, simulations); 
   var change = {change: simulated_root};
-  var verified = Awake_Verifier(change, variable, property, type, oldValue, socket);
+  var verified = Awake_Verifiers(change, variable, property, type, oldValue, socket);
 
   if (verified) { 
     Change_Property(type, variable, property, change.change);
@@ -563,21 +564,15 @@ function Handshake (socket) {
 
 // ---- ---- ---- ----  Watchers  ---- ---- ---- ----
 function Watch (object, func, preferences) {
-  Record(object, func, preferences);
+  Record(object, func, preferences, 'watch');
 }
 
 function Verify (object, func, preferences) {
-  if (!preferences) 
-    preferences = {}
-
-  preferences.verifier = true;
-  
-  Record(object, func, preferences);
+  Record(object, func, preferences, 'verify');
 }
 
-function Record (object, func, preferences) { 
-  var verifier,
-      local = true,
+function Record (object, func, preferences, kind) { 
+  var local = true,
       remote = true,
       recursive = false,
       id = object['syc-object-id'];
@@ -594,13 +589,11 @@ function Record (object, func, preferences) {
       return;
 
     recursive = preferences.recursive || false;
-   
-    verifier = preferences.verifier;
   }
 
   var identifier = Hash_Code(String(func));
     
-  if (verifier) { 
+  if (kind === 'verify') { 
     Syc.verifiers[id] = (Syc.verifiers[id] || {});
     Syc.verifiers[id][identifier] = Wrapper;
   } else {
@@ -613,7 +606,7 @@ function Record (object, func, preferences) {
     ancestors.forEach ( function (object) { 
       var id = object['syc-object-id'];
 
-      if (verifier) { 
+      if (kind === 'verify') { 
         Syc.verifiers[id] = (Syc.verifiers[id] || {});
         Syc.verifiers[id][identifier] = Wrapper;
       } else {
@@ -624,34 +617,37 @@ function Record (object, func, preferences) {
   }
 
   function Wrapper (change) { 
+    var result;
     if (local && !remote) { 
-       Local_Only(change);
+       result = Local_Only(change);
     } else if (remote && !local) { 
-       Remote_Only(change);
+       result = Remote_Only(change);
     } else if (remote && local) {
-       Both(change);
+       result = Both(change);
     }
 
     if (recursive) {
       Recursive(change);
     }
+
+    return result;
   }
 
   function Local_Only (change) { 
     if (change.local && !change.remote) {
-      func(change);
+      return func(change);
     }
   }
 
   function Remote_Only (change) { 
     if (change.remote && !change.local) {
-      func(change);
+      return func(change);
     }
   }
 
   function Both (change) { 
     if (change.remote || change.local) { 
-      func(change);
+      return func(change);
     }
   }
 
@@ -667,7 +663,10 @@ function Record (object, func, preferences) {
       ancestors.forEach( function (object) { 
         var id = object['syc-object-id'];
 
-        delete Syc.watchers[id][identifier];
+        if (kind === 'verify') 
+          delete Syc.verifies[id][identifier];
+        else 
+          delete Syc.watchers[id][identifier];
       });
     }
 
@@ -711,7 +710,7 @@ function Unverify (func, object) {
 
     Remove(id, identifier);
   } else {
-    for (id in Syc.watchers) { 
+    for (id in Syc.verifier) { 
       Remove (id, identifier);
     }
   }
@@ -741,19 +740,17 @@ function Awake_Watchers (local, variable, property, type, oldValue, socket) {
   }
 }
 
-function Awake_Verifiers (variable, property, type, oldValue, socket) { 
+function Awake_Verifiers (change, variable, property, type, oldValue, socket) { 
   var id = variable['syc-object-id'];
-
-  var change = {};
 
   change.variable = variable;
   change.property = property;
   change.type = type;
   change.oldValue = oldValue;
-  change.change = change.variable[change.property];
+  change.remote = true;
 
-  for (var identifier in Syc.watchers[id]) {
-    var result = Syc.watchers[id][identifier](change, socket);
+  for (var identifier in Syc.verifiers[id]) {
+    var result = Syc.verifiers[id][identifier](change, socket);
     if (!result) {
       return false;
     }

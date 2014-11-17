@@ -55,7 +55,7 @@ Now syc will be able to sync variables with this client. The callback will be ca
 ## One-way Variables (Server side)
 
     // Server side
-    var served;
+    var served = [1, 2, 3];
     syc.serve('name', served);
 
 Serving a variable restricts the client from making any changes to data bound to the served variable. Useful for when you do not want a malicious client to tampering with the data. 

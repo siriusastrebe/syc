@@ -3,11 +3,11 @@ Syc
 
 Reactive javascript variables, automatically synchronized between server and client.
 
-Wheny you pass a variable on the server side, an identical variable will appear on the client side. Changes to this variable will be caught by Object.observe to be communicated and updated via socket.io instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
+Pass an array or object through Syc on the server side, and an object/array with identical properties and values will appear on the client side. Changes to this variable will be caught by Object.observe to be communicated via socket.io and synchronized instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
 
 Like Meteor, but without the framework.
 
-Syc uses Object.observe if it's available for immediate responsiveness and performance, but will easily fall back onto a polyfill for older clients or Node instances.
+Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
 ## Syncing a variable (Server side)
 
@@ -128,6 +128,6 @@ When a client makes a change, verifiers will be called *before* the change happe
 - - - 
 This library is a work in progress.
 
-Planned features: Groups (Still in planning). This feature would provide security and selective data sharing for clients.
+Planned features: Unverifiers, Groups (Still in planning): This feature would provide security and selective data sharing for clients.
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind. Try it!

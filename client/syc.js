@@ -51,7 +51,8 @@ var Syc = {
 
   /* ---- ---- ---- ----  Setting up  ---- ---- ---- ----  */
   Handshake: function () {
-    Syc.handshake_callback();
+    if (Syc.handshake_callback)
+      Syc.handshake_callback();
   },
 
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */

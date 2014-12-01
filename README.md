@@ -48,10 +48,12 @@ And on the client:
 
     // Client side setup
     var socket = io.connect();
-    Syc.connect(socket, callback);
+    Syc.connect(socket);
     
 Now syc will be able to sync variables with this client. Alternatively, you can provide a callback:
 
+    // Client side setup
+    var socket = io.connect();
     Syc.connect(socket, function () { 
         alert(Syc.list('name').hello)
     });

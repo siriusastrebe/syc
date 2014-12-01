@@ -3,11 +3,11 @@ Syc
 
 Reactive javascript variables, automatically synchronized between server and client.
 
-Pass an array or object through Syc on the server side, and an object/array with identical properties and values will appear on the client side. Changes to this variable will be caught by Object.observe to be communicated via socket.io and synchronized instantaneously. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Client, removing the headache of data synchronization.
+Pass an object or array through Syc on the server, and an identical object/array will appear on the client side. Changes to this variable will be communicated and synchronized instantly. Clients can also modify the variable and the changes will be broadcast to the server and other clients. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
 
 Like Meteor, but without the framework.
 
-Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
+Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable. Requires socket.io.
 
 ## Syncing a variable (Server side)
 
@@ -50,7 +50,15 @@ And on the client:
     var socket = io.connect();
     Syc.connect(socket, callback);
 
-Now syc will be able to sync variables with this client. The callback will be called after Syc has connected and received up to date data.
+Now syc will be able to sync variables with this client. \
+
+The callback will be called after Syc has connected and received up to date data. A common use is to wait for the callback before handling Syc objects/arrays:
+    
+    // Client
+    var socket = io.connect();
+    Syc.connect(socket, function () { 
+        alert(Syc.list('name').hello)
+    });
 
 ## One-way Variables (Server side)
 
@@ -70,15 +78,9 @@ Occasionally, you'll want to be notified when changes are made to you variable.
         console.log(change);
     }
     
-    syc.watch(object, alertMe, {remote: true, local: true, recursive: false})
-
-This pops up a console message every time you receive a local or remote change to the object.
-
-The preferences argument can be ommitted, with `remote` and `local` defaulting to `true` and `recursive` to `false`. 
-If recursive is true, all descendants will be watched. Any new children object/arrays created after the watcher will automatically be given a trigger for the same function. Objects that whose references were deleted after the watcher was created will automatically be unwatched.
+    syc.watch(object, alertMe)
 
 Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
-
 
 `change` has the following properties available to it:
 
@@ -96,7 +98,15 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 `change.local`, `change.remote` One of these will be true depending on the origin of the change.
 
-*Note:* Server side watchers have access to the originating socket `function (changes, socket)`
+*Note:* Server side watchers have access to the originating socket `function (changes, socket)`.
+
+You can also specify preferences: 
+    
+    syc.watch(object, alertMe, {remote: true, local: true, recursive: false})
+
+If the preferences argument is ommitted, `remote` and `local` default to `true` and `recursive` to `false`. 
+
+If recursive, all descendants to the object in question will be watched. Any new children object/arrays created after the watcher will automatically be given a trigger for the same function. Objects that whose references were deleted after the watcher was created will automatically be unwatched.
 
 ### Unwatching
 
@@ -123,7 +133,7 @@ By its nature, verifiers are only triggered on receiving a remote change origina
 
 When a client makes a change, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted and then watchers will be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
-*Note*: `change.change` can be altered by the callback. This change will be reflected in the final result. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, changes will reflect on that object even when the verifier returns false.
+*Advanced tip*: `change.change` can be altered by the callback. This change will be reflected in the final result. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, changes will reflect on that object even when the verifier returns false.
 
 - - - 
 This library is a work in progress.

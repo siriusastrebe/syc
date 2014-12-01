@@ -50,15 +50,13 @@ And on the client:
     var socket = io.connect();
     Syc.connect(socket, callback);
 
-Now syc will be able to sync variables with this client. \
-
-The callback will be called after Syc has connected and received up to date data. A common use is to wait for the callback before handling Syc objects/arrays:
-    
-    // Client
+    // Client side setup
     var socket = io.connect();
     Syc.connect(socket, function () { 
         alert(Syc.list('name').hello)
     });
+    
+Now syc will be able to sync variables with this client. The callback will be called after Syc has connected and received up to date data.
 
 ## One-way Variables (Server side)
 

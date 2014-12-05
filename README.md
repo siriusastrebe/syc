@@ -50,15 +50,23 @@ And on the client:
     var socket = io.connect();
     Syc.connect(socket);
     
-Now syc will be able to sync variables with this client. Alternatively, you can provide a callback:
+Now syc will be able to sync variables with this client.
 
-    // Client side setup
-    var socket = io.connect();
-    Syc.connect(socket, function () { 
-        alert(Syc.list('name').hello)
-    });
-    
-The callback will be called after Syc has connected and received up to date data. 
+### Accessing initial data (Client side)
+
+    Syc.connect(socket);
+    var data = Syc.list('name');
+
+Most often `data` will come back as undefined if used in the manner above. It takes a moment for Syc to retrieve data from the server, so `Syc.list()` needs a second to synchronize. There are two methods for dealing with this delay:
+
+    Syc.connect(socket, callback);
+
+`callback` is an optional parameter and will be triggered when Syc is entirely synchronized to the data held on the server.
+
+    Syc.list('name', callback);
+
+If `Syc.list('name')` comes back as undefined, the callback function will be triggered whenever the client receives data for the variable. Useful when `'name'` will be synced or served at some point in the future.
+
 
 ## One-way Variables (Server side)
 

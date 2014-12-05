@@ -112,9 +112,9 @@ You can also specify preferences:
     
     syc.watch(object, alertMe, {remote: true, local: true, recursive: false})
 
-If the preferences argument is ommitted, `remote` and `local` default to `true` and `recursive` to `false`. 
+Specifying `remote` or `local` as false will cause the watcher to ignore changes that originate either locally or remotely. `remote` and `local` both default to `true`. `recursive` defaults to `false`. 
 
-If recursive, all descendants to the object in question will be watched. Any new children object/arrays created after the watcher will automatically be given a trigger for the same function. Objects that whose references were deleted after the watcher was created will automatically be unwatched.
+If recursive is true, all descendants to the object in question will be watched. Any new children object/arrays created after the watcher will automatically be given a trigger for the same function. Objects that whose references were deleted after the watcher was created will automatically be unwatched.
 
 ### Unwatching
 

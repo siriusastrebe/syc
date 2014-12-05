@@ -146,6 +146,6 @@ When a client makes a change, verifiers will be called *before* the change happe
 - - - 
 This library is a work in progress.
 
-Planned features: Unverifiers, Groups (Still in planning): This feature would provide security and selective data sharing for clients.
+Planned features: Unverifiers, Groups (Still in planning): This feature would provide security and selective data sharing for clients, Custom datastructures (Still in planning): This feature would allow you to specify conversion of arbitrary data structures to JSON and back, allowing synchronization from server to client.
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind. Try it!

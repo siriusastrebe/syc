@@ -63,10 +63,10 @@ Most often `data` will come back as undefined if used in the manner above. It ta
 
 `callback` is an optional parameter and will be triggered when Syc is entirely synchronized to the data held on the server.
 
+    function callback (variable_root) { }
     Syc.list('name', callback);
 
-If `Syc.list('name')` comes back as undefined, the callback function will be triggered whenever the client receives data for the variable. Useful when `'name'` will be synced or served at some point in the future.
-
+The callback function will be triggered immediately if there is already data associated with Syc.list('name'). Otherwise the callback will wait until the client receives data for the variable. Useful when `'name'` will be synced or served at some point in the future.
 
 ## One-way Variables (Server side)
 

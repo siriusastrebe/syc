@@ -1,41 +1,31 @@
 "use strict";
 
 var Syc = {
-  connect: function (socket, callback) {
+  Connect: function (socket, callback) {
+    // Sanitize
+    if (callback && Syc.Type(callback) !== 'function') throw "Syc error: Syc.connect() takes a socket and a callback function";
+
+    // connect
+
     Syc.Socket = socket;
 
     socket.on('syc-message-parcel', Syc.Receive_Message);
-
     if ( !(Object.observe) && !(Syc.mapping_timer) )
       Syc.mapping_timer = setInterval(Syc.Traverse, Syc.polyfill_interval);
 
     Syc.handshake_callback = callback;
   },
 
-  List: function (argument) { return Syc.list(argument) },
-  list: function (name) {
-    if (name === undefined) { 
-      var all = {}
-      for (var variable in Syc.variables) {
-        var id = Syc.variables[variable];
-        all[variable] = Syc.objects[id];
-      }
-      return all;
-    } else {
-      return Syc.objects[Syc.variables[name]];
-    }
-  },
-
-  watch: function (object, func, preferences) { 
-    Syc.Watch(object, func, preferences);
-  },
-
-  unwatch: function (func, object) {
-    Syc.Unwatch(func, object);
-  },
+  connect: function (socket, callback) { return Syc.Connect(socket, callback) },
+  list: function (name, callback) { return Syc.List(name, callback) },
+  ancestors: function (object) { return Syc.Ancestors(object) },
+  exists: function (object) { return Syc.Exists(object); },
+  watch: function (object, func, preferences) { Syc.Watch(object, func, preferences) },
+  unwatch: function (func, object) { Syc.Unwatch(func, object) },
 
   variables: {},
   objects: {},
+  callbacks: {},
 
   polyfill_interval: 260,
 
@@ -51,14 +41,15 @@ var Syc = {
 
   /* ---- ---- ---- ----  Setting up  ---- ---- ---- ----  */
   Handshake: function () {
-    if (Syc.handshake_callback)
-      Syc.handshake_callback();
+    if (Syc.handshake_callback) {
+      try { Syc.handshake_callback() }
+      catch (e) { console.error("Syc connection callback error", e) }
+    }
   },
 
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
   Receive_Message: function (messages) { 
     messages.forEach( function (message) { 
-
       console.log(message);
 
       var title = message[0],
@@ -84,11 +75,21 @@ var Syc = {
   New_Variable: function (data) { 
     var name = data.name,
         id = data.value,
+        pending,
         description = data.description;
 
     Syc.variables[name] = id;
 
     var variable = Syc.Resolve(description);
+
+    var callbacks = Syc.callbacks[name];
+
+    if (callbacks) {
+      while (callbacks.length > 0) { 
+        var callback = callbacks.pop();
+        callback(variable);
+      }
+    }
   },
 
   Receive_Change: function (data) { 
@@ -134,7 +135,7 @@ var Syc = {
 
       if (id in Syc.objects) { 
         return Syc.objects[id];
-      } else { 
+      } else {
         if (type === 'object') variable = {};
         if (type === 'array') variable = [];
 
@@ -199,9 +200,9 @@ var Syc = {
 
       Syc.Map_Property(object, property);
 
-      Syc.Awake_Watchers(true, object, property, type, oldValue);
-
       Syc.Socket.emit('syc-object-change', { value: id, type: type,  property: property, changes: changes });
+
+      Syc.Awake_Watchers(true, object, property, type, oldValue);
     }
   },
 
@@ -238,11 +239,6 @@ var Syc = {
     }
   },
 
-  Type: function (obj) { 
-    return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
-  },
-
-  // --- --- ------ ----  Helper Functions  ---- ---- ---- ----
   Meta: function (variable, one_way, id) {
     var id = id || token();
 
@@ -266,8 +262,49 @@ var Syc = {
     return id;
   },
 
+  Type: function (obj) { 
+    return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
+  },
+
+  // --- --- ------ ----  Helper Functions  ---- ---- ---- ----
+  List: function (name, callback) {
+    // Sanitizing
+    var type = typeof name;
+    if (type !== 'string') 
+      throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
+    if (callback) { 
+      var type = typeof callback;
+      if (type !== "function") throw "Syc error: The second argument you provided for Syc.list(string, callback) is " +type+ " but needs to be a function."
+    }
+
+    // listing
+    if (name === undefined) { 
+      var all = {}
+      for (var variable in Syc.variables) {
+        var id = Syc.variables[variable];
+        all[variable] = Syc.objects[id];
+      }
+      return all;
+    } else {
+      var obj = Syc.objects[Syc.variables[name]];
+      if (obj === undefined) {
+        if (!Syc.callbacks[name]) Syc.callbacks[name] = [];
+        Syc.callbacks[name].push(callback);
+      } else if (callback) { 
+        callback(obj);
+      }
+
+      return obj;
+    }
+  },
 
   Ancestors: function (variable, visited, objects) {
+    // Sanitize
+    var type = typeof variable;
+    if (type !== 'object') throw "Syc error: Syc.ancestors() takes an object, you provided " +type+ ".";
+    if (!Syc.exists(variable)) throw "Syc error: Syc.ancestors can only be called on Syc registered objects and arrays.";
+
+    // Ancestors
     var id = variable['syc-object-id'],
         visited = visited || {},
         objects = objects || [];
@@ -288,15 +325,32 @@ var Syc = {
 
     return objects;
   },
+
+  Exists: function (object) {
+    // Sanitize
+    var type = typeof object;
+    if (type !== 'object') throw "Syc error: Syc.exists() takes an object, you provided " +type+ ".";
+
+    // Exists
+    var id = object['syc-object-id'];
+    if (!id) return false;   
+    if (Syc.objects[id]) return true;
+    return false;
+  },
   
 
   // ---- ---- ---- ----  Watchers  ---- ---- ---- ---- 
   Watch: function (object, func, preferences) { 
+    // Sanitizing
+    var typeO = Syc.Type(object); var typeF = Syc.Type(func);
+    if ((typeO !== 'object' && typeO !== 'array') || typeF !== 'function') throw "Syc error: Syc.watch() takes an object and a function. You gave " +typeO+ " and " +typeF+ ".";
+    if (!Syc.exists(object)) throw "Syc error: in Syc.watch(object, function), object must be a variable registered by Syc."
+
+    // Watch
     var local = true,
         remote = true,
         recursive = false,
         id = object['syc-object-id'];
-
 
     if (preferences) {
       if (preferences.local && preferences.remote) {
@@ -343,19 +397,22 @@ var Syc = {
 
     function Local_Only (change) { 
       if (change.local && !change.remote) {
-        func(change);
+        try { func(change); }
+        catch (e) { console.error("Syc.Watch() callback error: ", e) }
       }
     }
 
     function Remote_Only (change) { 
       if (change.remote && !change.local) {
-        func(change);
+        try { func(change); }
+        catch (e) { console.error("Syc.Watch() callback error: ", e) }
       }
     }
 
     function Both (change) { 
       if (change.remote || change.local) { 
-        func(change);
+        try { func(change); }
+        catch (e) { console.error("Syc.Watch() callback error: ", e) }
       }
     }
 
@@ -389,6 +446,16 @@ var Syc = {
   },
 
   Unwatch: function (func, object) {
+    // Sanitize
+    var typeF = Syc.Type(func);
+    if (typeF !== 'function') throw "Syc error: Syc.unwatch() takes a function as the first argument. You provided a " +typeF+ ".";
+    if (object) {
+      var typeO = Syc.Type(object);
+      if (typeO !== 'object' && typeO !== 'array') throw "Syc error: Syc.unwatch takes an optional object as a second argument. You provided a " +typeO+ ".";
+      if (!Syc.exists(object)) throw "Syc error: in Syc.unwatch(function, object), object must be a variable registered by Syc."
+    }
+
+    // Unwatch
     var identifier = Syc.Hash_Code(String(func));
 
     if (object) {

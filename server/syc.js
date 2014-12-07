@@ -84,7 +84,7 @@ Syc = {
   objects: {},
 
   polyfill_interval: 260,
-  integrity_interval: 18000,
+  integrity_interval: 36000,
   buffer_delay: 20,
   reset_limit: 8
 }

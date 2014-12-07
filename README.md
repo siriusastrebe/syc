@@ -5,8 +5,6 @@ Javascript objects and arrays, automatically synchronized between client and ser
 
 Pass an object or array filled with data through Syc on the server, and an identical object/array will appear on the client side. Changes to this variable will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
 
-Like Meteor, but without the framework.
-
 Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
 ## Syncing a variable (Server side)

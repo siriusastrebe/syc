@@ -143,6 +143,16 @@ When a client makes a change, verifiers will be called *before* the change happe
 
 *Advanced tip*: `change.change` can be altered by the callback. This change will be reflected in the final result. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, changes will reflect on that object even when the verifier returns false.
 
+## Helper Functions
+
+    Syc.exists(object)
+    // This checks if the given object is registered by Syc and is being tracked.
+    
+    Syc.ancestors(object)
+    // This returns objects and arrays that are referenced downstream from this object.
+    
+    Syc.Type(variable)
+    // The built in type system Syc uses.
 - - - 
 This library is a work in progress.
 

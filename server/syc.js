@@ -13,7 +13,7 @@ var send_timer;
 var reset_counter = {};
 
 Syc = {
-  connect: function (socket) { 
+  Connect: function (socket) { 
     connected.push(socket);
 
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
@@ -30,21 +30,6 @@ Syc = {
     if (!mapping_timer) mapping_timer = setInterval(Traverse, Syc.traversal_interval);
   },
 
-  list: function (name) {
-    if (name === undefined) { 
-      var all = {}
-      for (var variable in Syc.variables) {
-        var id = Syc.variables[variable];
-        all[variable] = Syc.objects[id];
-      }
-      return all;
-    } else {
-      return Syc.objects[Syc.variables[name]];
-    }
-  },
-
-  List: function (argument) { return Syc.list(argument) },
-  
   sync: function (name, variable) {
     if (variable instanceof Syc.sync)
       var variable = this; 
@@ -53,7 +38,7 @@ Syc = {
     if (Type(variable) !== 'object' && Type(variable) !== 'array')
       throw "Syc error: Can't synchronize a stand-alone variable. Use an object or an array instead."
 
-    Name(name, variable);
+    New_Variable(name, variable);
 
     return variable;
   },
@@ -66,22 +51,32 @@ Syc = {
     if (Type(variable) !== 'object' && Type(variable) !== 'array')
       throw "Syc error: Can't synchronize a stand-alone variable. Use an object or an array instead."
 
-    Name(name, this, true);
+    New_Variable(name, this, true);
   },
 
-  Watch: function (object, func, preferences) { Watch(object, func, preferences) },
-  watch: function (object, func, preferences) { Watch(object, func, preferences) },
-  Verify: function (object, func, preferences) { Verify(object, func, preferences) },
-  verify: function (object, func, preferences) { Verify(object, func, preferences) },
+  connect:   Syc.Connect,
+  List:      List,
+  list:      List,
+  Ancestors: Ancestors,
+  ancestors: Ancestors,
+  Exists:    Exists,
+  exists:    Exists,
+  Watch:     Watch,
+  watch:     Watch,
+  Unwatch:   Unwatch,
+  unwatch:   Unwatch,
+  Verify:    Verify,
+  verify:    Verify,
+  Type: Type,
+  type: Type,
 
   watchers: {},
   verifiers: {},
 
-  Type: Type,
-  type: Type,
 
   variables: {},
   objects: {},
+  callbacks: {},
 
   polyfill_interval: 260,
   integrity_interval: 36000,
@@ -90,23 +85,7 @@ Syc = {
 }
 
                 
-
-/*         Error Handlers        */
-function DuplicateNameError (name) { 
-  this.value = name;
-  this.message = "There is already a syc variable by that name";
-  this.toString = function () { return this.value + " " + this.message }
-} 
-
-function InvalidTypeError (type) { 
-  this.value = type;
-  this.message = "Unsupported variable type introduced into this syc object.";
-  this.toString = function () { return this.value + " " + this.message }
-}
-
-
 // ---- ---- ---- ----  Helper  ---- ---- ---- ----
-
 function Emit (title, data, sockets) { 
   var audience = sockets || connected;
 
@@ -164,13 +143,84 @@ function Buffer (title, data, audience) {
   }
 }
 
+function List (name) {
+  // Sanitizing
+  var type = typeof name;
+  if (type !== 'string') 
+    throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
+  if (callback) { 
+    var type = typeof callback;
+    if (type !== "function") throw "Syc error: The second argument you provided for Syc.list(string, callback) is " +type+ " but needs to be a function."
+  }
+
+  // listing
+  if (name === undefined) { 
+    var all = {}
+    for (var variable in Syc.variables) {
+      var id = Syc.variables[variable];
+      all[variable] = Syc.objects[id];
+    }
+    return all;
+  } else {
+    var obj = Syc.objects[Syc.variables[name]];
+    if (obj === undefined) {
+      if (!Syc.callbacks[name]) Syc.callbacks[name] = [];
+      Syc.callbacks[name].push(callback);
+    } else if (callback) { 
+      callback(obj);
+    }
+
+    return obj;
+  }
+}
+
+function Ancestors (variable, visited, objects) {
+  // Sanitize
+  var type = typeof variable;
+  if (type !== 'object') throw "Syc error: Syc.ancestors() takes an object, you provided " +type+ ".";
+  if (!Exists(variable)) throw "Syc error: Syc.ancestors can only be called on Syc registered objects and arrays.";
+
+  // Ancestors
+  var id = variable['syc-object-id'],
+      visited = visited || {},
+      objects = objects || [];
+
+  if (visited[id]) 
+    return;
+  else
+    visited[id] = true;
+
+  objects.push(variable);
+
+  for (var property in variable) {
+    var type = Type(variable[property]);
+
+    if (type === 'object' || type === 'array') 
+      Ancestors(variable[property], visited, objects);
+  }
+
+  return objects;
+}
+
+function Exists (object) {
+  // Sanitize
+  var type = typeof object;
+  if (type !== 'object') throw "Syc error: Syc.exists() takes an object, you provided " +type+ ".";
+
+  // Exists
+  var id = object['syc-object-id'];
+  if (!id) return false;   
+  if (Syc.objects[id]) return true;
+  return false;
+}
+
 
 
 /* ---- ---- ---- ----  Observing and New Variables  ---- ---- ---- ---- */
-function Name (name, variable, one_way) { 
+function New_Variable (name, variable, one_way) { 
   var one_way = one_way || false;
 
-  if (name in Syc.variables) throw DuplicateNameError(name);
+  if (name in Syc.variables) throw "There is already a syc variable by the name " +name+ ".";
    
   id = Meta(variable, one_way);
   Syc.variables[name] = id;
@@ -180,6 +230,14 @@ function Name (name, variable, one_way) {
   Map_Object(variable);
 
   Broadcast('syc-variable-new', {name: name, value: id, description: description});
+
+  var callbacks = Syc.callbacks[name];
+  if (callbacks) {
+    while (callbacks.length > 0) { 
+      var callback = callbacks.pop();
+      callback(variable);
+    }
+  }
 }
 
 
@@ -572,6 +630,12 @@ function Verify (object, func, preferences) {
 }
 
 function Record (object, func, preferences, kind) { 
+  // sanitizing
+  var typeo = type(object); var typef = type(func);
+  if ((typeo !== 'object' && typeo !== 'array') || typef !== 'function') throw "syc error: syc." +kind+ "() takes an object and a function. you gave " +typeo+ " and " +typef+ ".";
+  if (!exists(object)) throw "syc error: in syc." +kind+ "(object, function), object must be a variable registered by syc."
+
+  // Record
   var local = true,
       remote = true,
       recursive = false,
@@ -602,7 +666,7 @@ function Record (object, func, preferences, kind) {
   }
 
   if (recursive) {
-    var ancestors = Syc.Ancestors(object);
+    var ancestors = Ancestors(object);
     ancestors.forEach ( function (object) { 
       var id = object['syc-object-id'];
 
@@ -658,7 +722,7 @@ function Record (object, func, preferences, kind) {
         new_type = Syc.Type(new_value);
 
     if (old_type === 'array' || old_type === 'object') { 
-      var ancestors = Syc.Ancestors(old_value);
+      var ancestors = Ancestors(old_value);
 
       ancestors.forEach( function (object) { 
         var id = object['syc-object-id'];
@@ -671,7 +735,7 @@ function Record (object, func, preferences, kind) {
     }
 
     if (new_type === 'array' || new_type === 'object') {
-      var ancestors = Syc.Ancestors(new_value);
+      var ancestors = Ancestors(new_value);
 
       ancestors.forEach( function (object) { 
         var id = object['syc-object-id'];
@@ -684,6 +748,16 @@ function Record (object, func, preferences, kind) {
 }
 
 function Unwatch (func, object) {
+  // sanitizing
+  var typef = type(func);
+  if (typef !== 'function') throw "syc error: syc.unwatch() takes function. You gave " +typef+ ".";
+  if (object) { 
+    var typeo = type(object)
+    if (typeo !== 'object' && typeo !== 'array') throw "syc error: syc.unwatch() takes an optional object as a second argument. You provided a " +typeo+ "."; 
+    if (!exists(object)) throw "syc error: in syc.unwatch(function, object), object must be a variable registered by syc.";
+  }
+
+  // Unwatch
   var identifier = Hash_Code(String(func));
 
   if (object) {
@@ -703,6 +777,16 @@ function Unwatch (func, object) {
 }
 
 function Unverify (func, object) {
+  // sanitizing
+  var typef = type(func);
+  if (typef !== 'function') throw "syc error: syc.unverify() takes function. You gave " +typef+ ".";
+  if (object) { 
+    var typeo = type(object)
+    if (typeo !== 'object' && typeo !== 'array') throw "syc error: syc.unverify() takes an optional object as a second argument. You provided a " +typeo+ "."; 
+    if (!exists(object)) throw "syc error: in syc.unverify(function, object), object must be a variable registered by syc.";
+  }
+
+  // Unverify
   var identifier = Hash_Code(String(func));
 
   if (object) {

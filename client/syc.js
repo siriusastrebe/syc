@@ -16,12 +16,13 @@ var Syc = {
     Syc.handshake_callback = callback;
   },
 
-  connect: function (socket, callback) { return Syc.Connect(socket, callback) },
-  list: function (name, callback) { return Syc.List(name, callback) },
-  ancestors: function (object) { return Syc.Ancestors(object) },
-  exists: function (object) { return Syc.Exists(object); },
-  watch: function (object, func, preferences) { Syc.Watch(object, func, preferences) },
-  unwatch: function (func, object) { Syc.Unwatch(func, object) },
+  connect:   Syc.Connect,
+  list:      Syc.List(name, callback),
+  ancestors: Syc.Ancestors(object),
+  exists:    Syc.Exists(object),
+  watch:     Syc.Watch(object, func, preferences),
+  unwatch:   Syc.Unwatch(func, object),
+  type:      Syc.Type(variable),
 
   variables: {},
   objects: {},
@@ -83,7 +84,6 @@ var Syc = {
     var variable = Syc.Resolve(description);
 
     var callbacks = Syc.callbacks[name];
-
     if (callbacks) {
       while (callbacks.length > 0) { 
         var callback = callbacks.pop();

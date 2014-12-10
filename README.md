@@ -3,9 +3,7 @@ Syc
 
 Javascript objects and arrays, automatically synchronized between client and server.
 
-Pass an object or array through Syc on the server, and an identical object/array will appear on the client side. Changes to this variable will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
-
-Like Meteor, but without the framework.
+Pass an object or array filled with data through Syc on the server, and an identical object/array will appear on the client side. Changes to this variable will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
 
 Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
@@ -143,7 +141,16 @@ When a client makes a change, verifiers will be called *before* the change happe
 
 *Advanced tip*: `change.change` can be altered by the callback. This change will be reflected in the final result. **Warning**: Careful when making modifications to `change.change`. When it references an existing object, changes will reflect on that object even when the verifier returns false.
 
-## Helper Functions
+### Unverify
+
+You can unwatch an existing watcher:
+
+    syc.unverify(func, object)
+
+Object is an optional parameter. If its left blank, then all watcher that utilizes the function will be deleted.
+
+
+## Helper Functions (Server Side)
 
     Syc.exists(object)
     // This checks if the given object is registered by Syc and is being tracked.
@@ -156,6 +163,6 @@ When a client makes a change, verifiers will be called *before* the change happe
 - - - 
 This library is a work in progress.
 
-Planned features: Unverifiers, Groups (Still in planning): This feature would provide security and selective data sharing for clients, Custom datastructures (Still in planning): This feature would allow you to specify conversion of arbitrary data structures to JSON and back, allowing synchronization from server to client.
+Planned features: Groups (Still in planning): This feature would provide security and selective data sharing for clients, Custom datastructures (Still in planning): This feature would allow you to specify conversion of arbitrary data structures to JSON and back, allowing synchronization from server to client.
 
 Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind. Try it!

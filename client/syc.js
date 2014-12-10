@@ -16,13 +16,13 @@ var Syc = {
     Syc.handshake_callback = callback;
   },
 
-  connect:   Syc.Connect,
-  list:      Syc.List(name, callback),
-  ancestors: Syc.Ancestors(object),
-  exists:    Syc.Exists(object),
-  watch:     Syc.Watch(object, func, preferences),
-  unwatch:   Syc.Unwatch(func, object),
-  type:      Syc.Type(variable),
+  connect:   function (socket, callback) { return Syc.Connect(socket, callback) },
+  list:      function (name, callback) { return Syc.List(name, callback) },
+  ancestors: function (object) { return Syc.Ancestors(object) },
+  exists:    function (object) { return Syc.Exists(object) },
+  watch:     function (o, f, p) { return Syc.Watch(o, f, p) },
+  unwatch:   function (func, object) { return Syc.Unwatch(func, object) },
+  type:      function (variable) { return Syc.Type(variable) }, 
 
   variables: {},
   objects: {},
@@ -269,9 +269,10 @@ var Syc = {
   // --- --- ------ ----  Helper Functions  ---- ---- ---- ----
   List: function (name, callback) {
     // Sanitizing
-    var type = typeof name;
-    if (type !== 'string') 
-      throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
+    if (name) { var type = typeof name;
+      if (type !== 'string') 
+        throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
+    }
     if (callback) { 
       var type = typeof callback;
       if (type !== "function") throw "Syc error: The second argument you provided for Syc.list(string, callback) is " +type+ " but needs to be a function."

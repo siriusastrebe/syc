@@ -54,7 +54,7 @@ Syc = {
     New_Variable(name, this, true);
   },
 
-  connect:   Syc.Connect,
+  connect:   function (socket) { return Syc.Connect(socket) },
   List:      List,
   list:      List,
   Ancestors: Ancestors,
@@ -72,7 +72,6 @@ Syc = {
 
   watchers: {},
   verifiers: {},
-
 
   variables: {},
   objects: {},
@@ -146,8 +145,10 @@ function Buffer (title, data, audience) {
 function List (name) {
   // Sanitizing
   var type = typeof name;
-  if (type !== 'string') 
-    throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
+  if (name) { 
+    if (type !== 'string') 
+      throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
+  }
   if (callback) { 
     var type = typeof callback;
     if (type !== "function") throw "Syc error: The second argument you provided for Syc.list(string, callback) is " +type+ " but needs to be a function."
@@ -631,9 +632,9 @@ function Verify (object, func, preferences) {
 
 function Record (object, func, preferences, kind) { 
   // sanitizing
-  var typeo = type(object); var typef = type(func);
+  var typeo = Type(object); var typef = Type(func);
   if ((typeo !== 'object' && typeo !== 'array') || typef !== 'function') throw "syc error: syc." +kind+ "() takes an object and a function. you gave " +typeo+ " and " +typef+ ".";
-  if (!exists(object)) throw "syc error: in syc." +kind+ "(object, function), object must be a variable registered by syc."
+  if (!Exists(object)) throw "syc error: in syc." +kind+ "(object, function), object must be a variable registered by syc."
 
   // Record
   var local = true,
@@ -749,12 +750,12 @@ function Record (object, func, preferences, kind) {
 
 function Unwatch (func, object) {
   // sanitizing
-  var typef = type(func);
+  var typef = Type(func);
   if (typef !== 'function') throw "syc error: syc.unwatch() takes function. You gave " +typef+ ".";
   if (object) { 
-    var typeo = type(object)
+    var typeo = Type(object)
     if (typeo !== 'object' && typeo !== 'array') throw "syc error: syc.unwatch() takes an optional object as a second argument. You provided a " +typeo+ "."; 
-    if (!exists(object)) throw "syc error: in syc.unwatch(function, object), object must be a variable registered by syc.";
+    if (!Exists(object)) throw "syc error: in syc.unwatch(function, object), object must be a variable registered by syc.";
   }
 
   // Unwatch
@@ -778,12 +779,12 @@ function Unwatch (func, object) {
 
 function Unverify (func, object) {
   // sanitizing
-  var typef = type(func);
+  var typef = Type(func);
   if (typef !== 'function') throw "syc error: syc.unverify() takes function. You gave " +typef+ ".";
   if (object) { 
-    var typeo = type(object)
+    var typeo = Type(object)
     if (typeo !== 'object' && typeo !== 'array') throw "syc error: syc.unverify() takes an optional object as a second argument. You provided a " +typeo+ "."; 
-    if (!exists(object)) throw "syc error: in syc.unverify(function, object), object must be a variable registered by syc.";
+    if (!Exists(object)) throw "syc error: in syc.unverify(function, object), object must be a variable registered by syc.";
   }
 
   // Unverify
@@ -842,102 +843,6 @@ function Awake_Verifiers (change, variable, property, type, oldValue, socket) {
 
   return true;
 }
-
-
-/*
-function Watch (variable_name, func, preferences) { 
-  var local = true,
-      remote = true;
-
-  if (preferences) {
-    local = preferences.local !== false;
-    remote = preferences.remote !== false;
-  }
-
-  if (local && remote) {
-    (generalWatchers[variable_name] = generalWatchers[variable_name] || []).push(func);
-  } else if (local) {
-    (localWatchers[variable_name] = localWatchers[variable_name] || []).push(func);
-  } else if (remote) { 
-    (remoteWatchers[variable_name] = remoteWatchers[variable_name] || []).push(func);
-  }
-}
-
-
-
-function Verify(variable_name, func) { 
-  verifiers[variable_name] = func;
-}
-
-function Awake_Verifier (change, variable, property, change_type, oldValue, socket) {
-  var id = variable['syc-object-id'],
-      verification = true;
-  
-  change.variable = variable;
-  change.property = property;
-  change.change_type = change_type;
-  change.oldValue = oldValue;
-
-  // TODO: This only accounts for the first variable to traverse onto this object
-  for (var name in verifiers) {
-    if (name in object_paths) {
-      if (id in object_paths[name]) {
-        var verifier = verifiers[name];
-
-        change.paths = Path(id, name);
-        change.root = Syc.objects[Syc.variables[name]];
-
-        verification = verifier(change, socket);
-      }
-    }
-  }
-
-  return verification;
-}
-
-
-function Awake_Watchers (local, variable, property, change_type, oldValue, socket) { 
-  var id = variable['syc-object-id'];
-
-  var change = {};
-
-  change.variable = variable;
-  change.property = property;
-  change.change_type = change_type;
-  change.oldValue = oldValue;
-  change.change = change.variable[change.property];
-
-  // TODO: This is shamefully inefficient to traverse on every watcher check
-  Traverse();
-
-  if (local) {
-    Find_Watchers(localWatchers);
-  } else {
-    Find_Watchers(remoteWatchers);
-  }
-
-  Find_Watchers(generalWatchers);
-
-  function Find_Watchers (list) {
-    // TODO: This only accounts for the first variable to traverse onto this object
-    for (var name in list) {
-
-      if (name in object_paths) { 
-        if (id in object_paths[name]) { 
-          change.paths = Path(id, name);
-          change.root = Syc.objects[Syc.variables[name]];
-
-          list[name].forEach( function (watcher) { 
-            watcher(change, socket);
-          });
-        }
-      }
-    }
-  }
-}
-*/
-
-
 
 // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
 // ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 
@@ -1125,12 +1030,5 @@ function Hash_Code (string) {
   return hash;
 }
 
- 
-
-
-
-
-
 
 module.exports = Syc;
-

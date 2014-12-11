@@ -3,7 +3,6 @@ var observe_lock = {};
 var observe_redirect = {};
 var object_map = {};
 var observable = !!Object.observe;
-var object_paths = {};
 
 var buffers = [];
 
@@ -222,15 +221,21 @@ function New_Variable (name, variable, one_way) {
   var one_way = one_way || false;
 
   if (name in Syc.variables) throw "There is already a syc variable by the name " +name+ ".";
-   
-  id = Meta(variable, one_way);
-  Syc.variables[name] = id;
 
-  var description = Describe_Recursive(variable);
+  if (!variable['syc-object-id']){ 
+    var id = Meta(variable, one_way),
+        description = Describe_Recursive(variable);
 
-  Map_Object(variable);
+    Syc.variables[name] = id;
+    Map_Object(variable);
+    Broadcast('syc-variable-new', {name: name, value: id, description: description});
+  } else { 
+    var description = Describe(variable),
+        id = description.value;
 
-  Broadcast('syc-variable-new', {name: name, value: id, description: description});
+    Syc.variables[name] = id;
+    Broadcast('syc-variable-new', {name: name, value: id, description: description});
+  }
 
   var callbacks = Syc.callbacks[name];
   if (callbacks) {
@@ -260,8 +265,6 @@ function Observed (changes) {
 
     Map_Property(object, property);
 
-    Awake_Watchers(true, object, property, type, oldValue);
-
     var data = { value: id, type: type, property: property, changes: changes }
 
     if (observe_redirect[id]) {
@@ -269,6 +272,8 @@ function Observed (changes) {
     } else {
       Broadcast('syc-object-change', data);
     }
+
+    Awake_Watchers(true, object, property, type, oldValue);
   }
 }
 
@@ -882,7 +887,6 @@ function Traverse () {
 
   // Start the recursion
   for (var name in Syc.variables) { 
-    object_paths[name] = {};
     Map(Syc.objects[Syc.variables[name]], name);
   }
 
@@ -933,13 +937,11 @@ function Map (variable, name, path) {
 }
 
 function Per_Object (variable, id, name, path) { 
-  if (visited[id]) { 
-   object_paths[name][id].push(path.slice(0));
+  if (visited[id])  
     return false;
-  } else { 
+  else 
     visited[id] = true;
-    object_paths[name][id] = [path.slice(0)];
-  }
+  
 
   Detect_Deletions(variable);
 

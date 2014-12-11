@@ -599,11 +599,11 @@ var Syc = {
     function Per_Object (variable) { 
       var id = variable['syc-object-id'];
 
-      if (visited[id]) {
+      if (visited[id])
         return false;
-      } else {
+      else 
         visited[id] = true;
-      }
+      
 
       var map = Syc.object_map[id];
   

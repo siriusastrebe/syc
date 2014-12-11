@@ -159,7 +159,7 @@ Object is an optional parameter. If its left blank, then all watcher that utiliz
     // This returns objects and arrays that are referenced downstream from this object.
     
     Syc.Type(variable)
-    // The built in type system Syc uses.
+    // The built in type system Syc uses. Can differentiate between 'object' and 'array'.
 - - - 
 This library is a work in progress.
 

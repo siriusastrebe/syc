@@ -1,9 +1,9 @@
 Syc
 ===
 
-Javascript objects and arrays, automatically synchronized between client and server.
+Javascript variables, automatically synchronized between client and server.
 
-Pass an object or array filled with data through Syc on the server, and an identical object/array will appear on the client side. Changes to this variable will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
+Create an object/array, pass it through Syc and an identical object/array will appear on the client side. Changes will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
 
 Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
@@ -18,17 +18,16 @@ To sync a variable from the server to the client, take an object or array and pa
 The client can use `syc.list()` to see all existing syc variables.
 
     // On the client side...
-    var shared = syc.list('name')
-    shared.hello
-    -> "world"
+    syc.list('name')
+    -> {hello: 'world'}
     
 You can change the data on either the server or the client... And see the change reflected everywhere else.    
 
     shared.goodbye = "farewell!"
 
     // elsewhere...
-    syc.list('name').goodbye
-    -> "farewell!"
+    syc.list('name')
+    -> {hello: 'world', goodbye: 'farewell!'}
 
 ## Setting up Syc
 
@@ -48,14 +47,13 @@ And on the client:
     var socket = io.connect();
     Syc.connect(socket);
     
-Now syc will be able to sync variables with this client.
-
 ### Accessing initial data (Client side)
 
+    // Client side...
     Syc.connect(socket);
     var data = Syc.list('name');
 
-Most often `data` will come back as undefined if used in the manner above. It takes a moment for Syc to retrieve data from the server, so `Syc.list()` needs a second to synchronize. There are two methods for dealing with this delay:
+If done in the manner above, most often `data` will come back as undefined, as it takes a moment for Syc to synchronize. There are two methods for dealing with this delay:
 
     Syc.connect(socket, callback);
 
@@ -64,7 +62,7 @@ Most often `data` will come back as undefined if used in the manner above. It ta
     function callback (variable_root) { }
     Syc.list('name', callback);
 
-The callback function will be triggered immediately if there is already data associated with Syc.list('name'). Otherwise the callback will wait until the client receives data for the variable. Useful when `'name'` will be synced or served at some point in the future.
+The callback function will be triggered immediately when data is already associated with Syc.list('name'). Otherwise, it will wait until the client receives data for that variable. Useful when `'name'` will be synced or served at some point in the future.
 
 ## One-way Variables (Server side)
 
@@ -78,7 +76,7 @@ Serving a variable restricts the client from making any changes to data bound to
 
 ## Watchers (Client and Server Side)
 
-Occasionally, you'll want to be notified when changes are made to you variable.
+Occasionally, you'll want to be notified when changes are made to your variable.
 
     function alertMe (change) {
         console.log(change);
@@ -90,41 +88,36 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 `change` has the following properties available to it:
 
-`change.variable` - The variable whose property was modified.
+    change.variable  // The variable whose property was modified.
+    change.property  // The modified property's name. The actual changed value can be found in change.variable[change.property].
+    change.change    // The actual changed value, shorthand for `change.variable[change.property]`
+    change.root      // The root of the syc variable that triggered the watcher.
+    change.oldValue  // A record of the previous value held in `change.variable[change.property]`.
+    change.type      // Any one of `add`, `update` or `delete`.
+    change.local     // True if the change originated locally.
+    change.remote    // True if the change was received from elsewhere.
 
-`change.property` - The modified property's name. The actual changed value can be found in `change.variable[change.property]`.
+*Note:* Server side watchers have access to the originating socket: 
 
-`change.change` - The actual changed value, shorthand for `change.variable[change.property]`
-
-`change.root` - The root of the syc variable that triggered the watcher.
-
-`change.oldValue` - A record of the previous value held in `change.variable[change.property]`.
-
-`change.type` - Any one of `add`, `update` or `delete`.
-
-`change.local`, `change.remote` One of these will be true depending on the origin of the change.
-
-*Note:* Server side watchers have access to the originating socket `function (changes, socket)`.
+    function (changes, socket)
 
 You can also specify preferences: 
     
     syc.watch(object, alertMe, {remote: true, local: true, recursive: false})
 
-Specifying `remote` or `local` as false will cause the watcher to ignore changes that originate either locally or remotely. `remote` and `local` both default to `true`. `recursive` defaults to `false`. 
+`remote` and `local` default to true. Setting them to false will ignore changes from that origin.
 
-If recursive is true, all descendants to the object in question will be watched. Any new children object/arrays created after the watcher will automatically be given a trigger for the same function. Objects that whose references were deleted after the watcher was created will automatically be unwatched.
+`recursive` defaults to `false`. If recursive is true, all descendants to the object in question will be watched. New descendants created later on will also be given the watcher. Descendants removed from the object will automatically be unwatched.
 
 ### Unwatching
 
-You can unwatch an existing watcher:
+    syc.unwatch(function, object)
 
-    syc.unwatch(func, object)
-
-Object is an optional parameter. If its left blank, then all watcher that utilizes the function will be deleted.
+Object is an optional parameter. If blank, then all watcher that utilizes the function will be deleted.
 
 ## Verifiers (Server side)
 
-While watchers are good for alerting changes after they happen, often you'll want to verify that a client's change is harmless before it takes effect. Verifiers look similar to watchers, but will accept a change only if the function returns true.
+While watchers are good for alerting changes after they happen, often you'll want to verify that a client's change is harmless before it takes effect. Verifiers have identical syntax to watchers, but will accept a change only if the function returns true.
 
     function check (change, socket) {
       if (typeof change.change !== 'string') 
@@ -143,12 +136,9 @@ In verifiers, `change.change`, unlike in Watchers, is not synonymous with `chang
 
 ### Unverify
 
-You can unwatch an existing watcher:
+    syc.unverify(function, object)
 
-    syc.unverify(func, object)
-
-Object is an optional parameter. If its left blank, then all watcher that utilizes the function will be deleted.
-
+Object is an optional parameter. If blank, all verifiers that utilizes the function will be deleted.
 
 ## Helper Functions (Server Side)
 

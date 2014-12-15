@@ -91,7 +91,6 @@ Watchers provide insight into an object whose property has been changed. If mult
     change.variable  // The variable whose property was modified.
     change.property  // The modified property's name. The actual changed value can be found in change.variable[change.property].
     change.change    // The actual changed value, shorthand for `change.variable[change.property]`
-    change.root      // The root of the syc variable that triggered the watcher.
     change.oldValue  // A record of the previous value held in `change.variable[change.property]`.
     change.type      // Any one of `add`, `update` or `delete`.
     change.local     // True if the change originated locally.
@@ -132,7 +131,7 @@ By its nature, verifiers are only triggered on receiving a remote change origina
 
 When a client makes a change, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted and then watchers will be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
-In verifiers, `change.change`, unlike in Watchers, is not synonymous with `change.variable[change.property]`. Instead, `change.change` is a simulation of what will be placed in `change.variable[change.property]` if the verifier returns true. *Advanced tip*: You can make modifications to `change.change` and the final result will reflect these modifications. **Warning**: Careful when making modifications to `change.change` when it references an existing object. These modifications will reflect on that object even when the verifier returns false.
+In watchers `change.change` is synonymous with `change.variable[change.property]`. This is not the case in verifiers. Instead, `change.change` is a simulation of what `change.variable[change.property]` will look like once the verifier returns true. *Tip*: You can modify `change.change` and the final result will reflect these modifications. **Warning**: Careful when doing so. `change.change` can sometimes reference an already existing object. Your modifications will reflect on that object even if the verifier returns false.
 
 ### Unverify
 

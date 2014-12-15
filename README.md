@@ -131,7 +131,7 @@ By its nature, verifiers are only triggered on receiving a remote change origina
 
 When a client makes a change, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted and then watchers will be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
-In watchers `change.change` is synonymous with `change.variable[change.property]`. This is not the case in verifiers. Instead, `change.change` is a simulation of what `change.variable[change.property]` will look like once the verifier returns true. *Tip*: You can modify `change.change` and the final result will reflect these modifications. **Warning**: Careful when doing so. `change.change` can sometimes reference an already existing object. Your modifications will reflect on that object even if the verifier returns false.
+In watchers `change.change` is synonymous with `change.variable[change.property]`. This is not the case in verifiers. Instead, `change.change` is a simulation of what will be contained there if the verifier returns true. *Advanced Tip*: You can modify `change.change` and the final result will reflect these modifications. **Warning**: Careful when doing so. `change.change` can sometimes reference an already existing object. Your modifications will reflect on that object even if the verifier returns false.
 
 ### Unverify
 

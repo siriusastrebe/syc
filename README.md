@@ -129,7 +129,7 @@ While watchers are good for alerting changes after they happen, often you'll wan
 
 By its nature, verifiers are only triggered on receiving a remote change originating from a client.
 
-When a client makes a change to the object, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted and then watchers will be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
+When a client makes a change to the object, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted. Watchers will then be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
 In watchers `change` is synonymous with `variable[property]`. This is not the case in verifiers. Instead, `variable[property]` contains the existing value, and `change` is a simulation of what will replace `variable[property]` if all verifiers return true. *Advanced Tip*: You can modify `change` and the final result will reflect these modifications. **Warning**: Careful when doing so. `change` can sometimes reference an already existing object, and your modifications will reflect on that object even if the verifier returns false.
 

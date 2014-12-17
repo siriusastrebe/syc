@@ -78,23 +78,23 @@ Serving a variable restricts the client from making any changes to data bound to
 
 Occasionally, you'll want to be notified when changes are made to your variable.
 
-    function alertMe (change) {
-        console.log(change);
+    function alertMe (changes) {
+        console.log(changes);
     }
     
     syc.watch(object, alertMe)
 
 Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
 
-`change` has the following properties available to it:
+`changes` has the following properties available to it:
 
-    change.variable  // The variable whose property was modified.
-    change.property  // The modified property's name. The actual changed value can be found in change.variable[change.property].
-    change.change    // The actual changed value, shorthand for `change.variable[change.property]`
-    change.oldValue  // A record of the previous value held in `change.variable[change.property]`.
-    change.type      // Any one of `add`, `update` or `delete`.
-    change.local     // True if the change originated locally.
-    change.remote    // True if the change was received from elsewhere.
+    changes.variable  // The variable whose property was modified.
+    changes.property  // The modified property's name. The actual changed value can be found in change.variable[change.property].
+    changes.change    // The actual changed value, shorthand for `change.variable[change.property]`
+    changes.oldValue  // A record of the previous value held in `change.variable[change.property]`.
+    changes.type      // Any one of `add`, `update` or `delete`.
+    changes.local     // True if the change originated locally.
+    changes.remote    // True if the change was received from elsewhere.
 
 *Note:* Server side watchers have access to the originating socket: 
 
@@ -118,8 +118,8 @@ Object is an optional parameter. If blank, then all watcher that utilizes the fu
 
 While watchers are good for alerting changes after they happen, often you'll want to verify that a client's change is harmless before it takes effect. Verifiers have identical syntax to watchers, but will accept a change only if the function returns true.
 
-    function check (change, socket) {
-      if (typeof change.change !== 'string') 
+    function check (changes, socket) {
+      if (typeof changes.change !== 'string') 
         return false;
       else
         return true;
@@ -129,9 +129,9 @@ While watchers are good for alerting changes after they happen, often you'll wan
 
 By its nature, verifiers are only triggered on receiving a remote change originating from a client.
 
-When a client makes a change, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted and then watchers will be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
+When a client makes a change to the object, verifiers will be called *before* the change happens. If all verifiers attached to the modified object returns truthy, the change is accepted and then watchers will be called. If any return falsy, the verifier drops the change, watchers will not be called, and the client is re-synced.
 
-In watchers `change.change` is synonymous with `change.variable[change.property]`. This is not the case in verifiers. Instead, `change.change` is a simulation of what will be contained there if the verifier returns true. *Advanced Tip*: You can modify `change.change` and the final result will reflect these modifications. **Warning**: Careful when doing so. `change.change` can sometimes reference an already existing object. Your modifications will reflect on that object even if the verifier returns false.
+In watchers `change` is synonymous with `variable[property]`. This is not the case in verifiers. Instead, `variable[property]` contains the existing value, and `change` is a simulation that will replace `variable[property]` if all verifiers return true. *Advanced Tip*: You can modify `change.change` and the final result will reflect these modifications. **Warning**: Careful when doing so. `change.change` can sometimes reference an already existing object. Your modifications will reflect on that object even if the verifier returns false.
 
 ### Unverify
 

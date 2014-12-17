@@ -98,7 +98,7 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 *Note:* Server side watchers have access to the originating socket: 
 
-    function (changes, socket)
+    function alertMe (changes, socket)
 
 You can also specify preferences: 
     

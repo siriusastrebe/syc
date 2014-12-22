@@ -9,7 +9,7 @@ Syc uses Object.observe when available for responsiveness and performance, but w
 
 ### Samples
 
-A sample chat application written in Syc
+A sample chat application written using Syc:
 
 http://treebeard.herokuapp.com/
 

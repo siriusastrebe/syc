@@ -3,7 +3,7 @@ Syc
 
 Javascript variables, automatically synchronized between client and server.
 
-Create an object/array, pass it through Syc and an identical object/array will appear on the client side. Changes will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
+Create an object/array on your Node server and pass it through Syc. An identical object/array will appear on the client side. Changes will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
 
 Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
@@ -15,7 +15,7 @@ http://treebeard.herokuapp.com/
 
 ## Syncing a variable (Server side)
 
-To sync a variable from the server to the client, take an object or array and pass it through Syc:
+To sync a variable from the server to the client, create an object or array and pass it through Syc:
 
     // On the server side...
     var shared = {hello: 'world'}

@@ -63,7 +63,9 @@ If done in the manner above, most often `data` will come back as undefined, as i
 
     Syc.connect(socket, callback);
 
-`callback` is an optional parameter and will be triggered when Syc is entirely synchronized to the data held on the server.
+This lets you run code as you connect to the server. `callback` is an optional parameter and will be triggered when Syc is entirely synchronized to the data held on the server.
+
+The second method allows you to call a function whenever data becomes availble: 
 
     function callback (variable_root) { }
     Syc.list('name', callback);

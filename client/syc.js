@@ -36,6 +36,7 @@ var Syc = {
   object_map: {},
 
   handshake_callback: undefined,
+  resetting: false,
 
   observable: !!Object.observe,
 
@@ -46,6 +47,12 @@ var Syc = {
       try { Syc.handshake_callback() }
       catch (e) { console.error("Syc connection callback error", e) }
     }
+
+    Syc.Traverse();
+
+    Syc.resetting = false;
+
+    Syc.handshake_callback = undefined; 
   },
 
   /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
@@ -108,6 +115,7 @@ var Syc = {
     var oldValue = variable[property];
 
     if (type === 'add' || type === 'update') { 
+      // Make the change
       variable[property] = Syc.Resolve(changes)
     } else if (type === 'delete') { 
       delete variable[property];
@@ -127,7 +135,7 @@ var Syc = {
         value,
         id, 
         one_way;
-     
+
     if (type === 'object' || type === 'array') { 
       properties = changes.properties,
       id         = changes.value,
@@ -144,7 +152,7 @@ var Syc = {
         }
 
         id = Syc.Meta(variable, one_way, id);
-     
+
         Syc.Map_Object(variable);
 
         return variable;
@@ -173,8 +181,8 @@ var Syc = {
 
   Reset: function (data) {
     Syc.objects = {};
-    Syc.object_map = {};
     Syc.variables = {};
+    Syc.resetting = true;
   },
 
   // ---- ---- ---- ----  Observing & Tracking Changes  ---- ---- ---- ----
@@ -200,9 +208,13 @@ var Syc = {
 
       Syc.Map_Property(object, property);
 
-      Syc.Socket.emit('syc-object-change', { value: id, type: type,  property: property, changes: changes });
-
-      Syc.Awake_Watchers(true, object, property, type, oldValue);
+      if (Syc.resetting) { 
+        // Don't transmit when we're resetting. We want to trigger watchers without reporting
+        Syc.Awake_Watchers(false, object, property, type, oldValue);
+      } else { 
+        Syc.Socket.emit('syc-object-change', { value: id, type: type,  property: property, changes: changes });
+        Syc.Awake_Watchers(true, object, property, type, oldValue);
+      }
     }
   },
 
@@ -502,7 +514,9 @@ var Syc = {
         local_hash = Syc.Generate_Hash();
 
     if (foreign_hash !== local_hash) {
-      Syc.Socket.emit('syc-reset-request');
+      console.warn('Syc warning: Out of sync. Client resetting. Provided hash: ' + foreign_hash + ', local hash: ' + local_hash);
+
+      Syc.Socket.emit('syc-reset-request', {hash: foreign_hash});
     }
   },
 

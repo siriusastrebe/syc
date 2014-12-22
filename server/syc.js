@@ -16,10 +16,9 @@ Syc = {
     connected.push(socket);
 
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
-    socket.on('syc-reset-request', function (data) { Reset(socket)}) 
+    socket.on('syc-reset-request', function (data) { Reset(socket, data)}) 
 
     Reset(socket);
-    Handshake(socket);
     
     if (Object.observe)
       Syc.traversal_interval = Syc.integrity_interval;
@@ -85,12 +84,22 @@ Syc = {
                 
 // ---- ---- ---- ----  Helper  ---- ---- ---- ----
 function Emit (title, data, sockets) { 
+  // Sanitizing
+  if (Syc.Type(sockets) !== 'array') throw "Syc error: Emit(title, data, sockets), sockets must be an array."
+  if (data[0] && data[0].hasOwnProperty('emit')) 
+    throw "Syc error: Emit(title, data, sockets) can't take sockets as a second parameter."
+
+  // Emitting
   var audience = sockets || connected;
 
   Buffer(title, data, audience)
 }
 
 function Broadcast (title, data, sender) { 
+  // Sanitizing
+  if (data.hasOwnProperty('emit')) throw "Syc error: Emit(title, data, sockets) can't take sockets as a second parameter."
+
+  // Emitting
   var audience = connected.slice(0), // create a clone so we don't tamper the original
       index = audience.indexOf(sender);
 
@@ -106,7 +115,7 @@ function Buffer (title, data, audience) {
 
   if ( !(send_timer) ) { 
     send_timer = setTimeout(
-   
+
       function () {
         var sockets = {};
 
@@ -178,7 +187,6 @@ function Ancestors (variable, visited, objects) {
   // Sanitize
   var type = typeof variable;
   if (type !== 'object') throw "Syc error: Syc.ancestors() takes an object, you provided " +type+ ".";
-  if (!Exists(variable)) throw "Syc error: Syc.ancestors can only be called on Syc registered objects and arrays.";
 
   // Ancestors
   var id = variable['syc-object-id'],
@@ -370,15 +378,15 @@ function Receive_Change (data, socket) {
       changes  = data.changes;
 
 
-  var variable = Syc.objects[id],
-      oldValue = variable[property];
+  var variable = Syc.objects[id];
   
   if (variable === undefined) {
     console.warn("Received changes to an unknown object: " + id + ". Resyncing client.");
     Reset(Socket);
   }
 
-  var description = Describe(variable[property]);
+  var oldValue = variable[property],
+      description = Describe(variable[property]);
 
   if (variable['syc-one-way'] === true) { 
     console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
@@ -466,7 +474,7 @@ function Receive_Change (data, socket) {
 
     if (type === 'delete') {
       if (object[property]) {
-        delete object[property];
+        delete variable[property];
       } else {
         observe_lock[id] = false;
       }
@@ -593,38 +601,51 @@ function Recurrable (type) {
 
 // ---- ---- ---- ----  Requests  ---- ---- ---- ----
 
-function Reset (socket) { 
+function Reset (socket, data) { 
   var described = {},
-      sid = socket.id;
+      sid = socket.id,
+      local_hash = Generate_Hash(),
+      foreign_hash;
 
-  if (sid in reset_counter) {
-    if (reset_counter[sid] > Syc.reset_limit + 2) {
-      return
-    } else if (reset_counter[sid] > Syc.reset_limit) {
-      console.warn('Syc: integrity check + reset failed ' + reset_counter[sid] + ' times with client ' + sid + '. Giving up on hard resetting client.');
+  // DDOS prevention
+  if (data) {
+    if (!(sid in reset_counter)) 
+      reset_counter[sid] = 0
 
-      reset_counter[sid] += 100;
-    } else {
-      reset_counter[sid] += 2;
+    reset_counter[sid] += 1;
+          
+    if (reset_counter[sid] > Syc.reset_limit) {
+      console.warn('Syc: integrity check failed ' + reset_counter[sid] + ' times with client ' + sid + '. Giving up on hard resetting client.');
+      reset_counter[sid] + 5 // Wait 5 integrity check cycles before allowing a reset.
+      return;
     }
+  }
+
+  // Resetting
+  if (data) foreign_hash = data.hash;
+  else foreign_hash = local_hash; 
+
+  // Resetting requires a full handshake so the client agrees which hash to synchronize.
+  if (foreign_hash === local_hash) { 
+    if (data) { console.log('Client out of sync, resetting client... Socket sid: ' + sid + ' Provided hash: ' + foreign_hash + ', local hash: ' + local_hash); }
+    else { console.log('Synchronizing client sid: ' + sid + '.'); }
+
+    Emit('syc-reset-command', {}, [socket]);
+
+    for (var name in Syc.variables) {
+      var id = Syc.variables[name],
+          variable = Syc.objects[id];
+
+      Emit('syc-variable-new', {name: name, value: id, description: Describe_Recursive(variable)}, [socket]);
+    }
+
+    Emit('syc-welcome', {}, [socket]);
+
   } else {
-    reset_counter[socket.id] = 2;
+    Emit('syc-integrity-check', {hash: local_hash}, [socket]);
   }
-
-  Emit('syc-reset-command', {}, [socket]);
-
-  for (var name in Syc.variables) {
-    var id = Syc.variables[name],
-        variable = Syc.objects[id];
-
-    Emit('syc-variable-new', {name: name, value: id, description: Describe_Recursive(variable)}, [socket]);
-  }
+  
 }
-
-function Handshake (socket) {
-  Emit('syc-welcome', {}, [socket]);
-}
-
 
 // ---- ---- ---- ----  Watchers  ---- ---- ---- ----
 function Watch (object, func, preferences) {
@@ -662,7 +683,7 @@ function Record (object, func, preferences, kind) {
   }
 
   var identifier = Hash_Code(String(func));
-    
+
   if (kind === 'verify') { 
     Syc.verifiers[id] = (Syc.verifiers[id] || {});
     Syc.verifiers[id][identifier] = Wrapper;
@@ -705,19 +726,22 @@ function Record (object, func, preferences, kind) {
 
   function Local_Only (change) { 
     if (change.local && !change.remote) {
-      return func(change);
+      try { return func(change); }
+      catch (e) { console.error("Syc." + kind + "() callback error: ", e, e.stack) }
     }
   }
 
   function Remote_Only (change) { 
     if (change.remote && !change.local) {
-      return func(change);
+      try { return func(change); }
+      catch (e) { console.error("Syc." + kind + "() callback error: ", e, e.stack) }
     }
   }
 
   function Both (change) { 
     if (change.remote || change.local) { 
-      return func(change);
+      try { return func(change); }
+      catch (e) { console.error("Syc." + kind + "() callback error: ", e, e.stack) }
     }
   }
 

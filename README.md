@@ -1,11 +1,9 @@
 Syc
 ===
 
-Javascript variables, automatically synchronized between client and server.
+Synchronize a javascript variable from a node server to clients, and have any changes to the variable synchronize in real time.
 
-Create an object/array on your Node server and pass it through Syc. An identical object/array will appear on the client side. Changes will be communicated and synchronized across the server and all clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
-
-Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
+Syc uses Object.observe() when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
 ### Samples
 

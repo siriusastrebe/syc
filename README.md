@@ -7,6 +7,12 @@ Create an object/array, pass it through Syc and an identical object/array will a
 
 Syc uses Object.observe when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
+### Samples
+
+A sample chat application written in Syc
+
+http://treebeard.herokuapp.com/
+
 ## Syncing a variable (Server side)
 
 To sync a variable from the server to the client, take an object or array and pass it through Syc:

@@ -1,7 +1,7 @@
 Syc
 ===
 
-Synchronize a javascript variable from a node server to clients, and have any changes to the variable update in real time.
+Synchronize a javascript variable from a node server to clients. See any changes to the variable update in real time.
 
 Create an object/array, pass it through Syc and an identical object/array will appear on the client side. Changes will be communicated and synchronized across the server and clients instantly. It works under a simple principle: All data bound to the variable in question is identical between Server and Clients, removing the headache of data synchronization.
 

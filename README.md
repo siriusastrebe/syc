@@ -3,7 +3,9 @@ Syc
 
 Javascript variables, automatically synchronized between client and server.
 
-Create an object (or array), pass it through Syc and an identical object (or array) will appear on the client side. Changes on either the client or the server are observed and communicated instantly. It works under a simple principle: All data bound to the variable in question is identical in all locations, removing the headache of data synchronization.
+Create an object (or array), pass it through Syc and an identical object (or array) will appear on the client side. Changes on either the client or the server are observed and communicated instantly. 
+
+It works under a simple principle: All data bound to the variable in question is identical in all locations, removing the headache of data synchronization.
 
 Syc uses Object.observe() when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
@@ -27,7 +29,7 @@ The client can use `syc.list()` to see all existing syc variables.
     syc.list('name')
     -> {hello: 'world'}
     
-You can change the data on either the server or the client... And see the change reflected everywhere else.    
+You can change the data on either the server or the client. Syc will observe the change as it happens and automatically communicate the new values.
 
     shared.goodbye = "farewell!"
 

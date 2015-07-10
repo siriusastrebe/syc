@@ -5,7 +5,6 @@ Synchronize data by putting it in an object or an array. Whenever that object or
 
 The isomorphism and reactivity of Meteor, without the framework. 
 
-    // On the server side...
     var shared = {hello: 'world'}
     syc.sync('name', shared);
 

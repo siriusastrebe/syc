@@ -1,19 +1,30 @@
 Syc
 ===
 
-Javascript variables, automatically synchronized between client and server.
+Synchronize data by putting it in an object or an array. Whenever that object or array changes, all your clients receive that change. If a client makes a change, you can verify it before it is synchronized.
 
-Create an object (or array), pass it through Syc and an identical object (or array) will appear on the client side. Changes on either the client or the server are observed and communicated instantly. 
+The isomorphism and reactivity of Meteor, without the framework. 
 
-It works under a simple principle: All data bound to the variable in question is identical in all locations, removing the headache of data synchronization.
+    // On the server side...
+    var shared = {hello: 'world'}
+    syc.sync('name', shared);
+
+It works under a simple principle: All data bound to the variable in question is identical in all locations, removing the headache of data synchronization. Any changes are instantly picked up and broadcast to clients. 
 
 Syc uses Object.observe() when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
-### Samples
+Examples
+===
 
-A sample chat application written using Syc:
+A side project proof of concept using Syc:
 
 http://treebeard.herokuapp.com/
+
+A simple chat application written in 
+https://github.com/siriusastrebe/Syc-Demo
+
+Documentation
+===
 
 ## Syncing a variable (Server side)
 

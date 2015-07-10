@@ -153,7 +153,7 @@ Verifiers have a property `changes.change` which is not available to watchers. I
 
 **Advanced Tip**: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. 
 
-<sub>**Warning** Careful when doing so, if the change references another registered Syc object or array, any changes you make will apply even if the verifier returns true.</sub>
+<sub>**Warning**: Careful when doing so, if the change references another registered Syc object or array, any changes you make will apply even if the verifier returns true.</sub>
 
 ### Unverify
 

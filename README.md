@@ -14,7 +14,6 @@ Instead of having to wrap your data in function calls for reactivity, Syc will o
 
 Simply: Data bound to the registered variable is identical in all locations, removing the headache of data synchronization. 
 
-Syc uses Object.observe() when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
 Examples
 ===

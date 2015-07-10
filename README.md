@@ -45,8 +45,8 @@ You can change the data on either the server or the client. Syc will observe the
     shared.goodbye = "farewell!"
 
     // elsewhere...
-    syc.list('name')
-    -> {hello: 'world', goodbye: 'farewell!'}
+    syc.list('name').goodbye
+    -> 'farewell!'
 
 ## Setting up Syc
 

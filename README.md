@@ -101,11 +101,10 @@ Serving a variable restricts the client from making any changes to data bound to
 
 Occasionally, you'll want to be notified when changes are made to your variable.
 
+    syc.watch(object, alertMe)
     function alertMe (changes) {
         console.log(changes);
     }
-    
-    syc.watch(object, alertMe)
 
 Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
 

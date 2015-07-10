@@ -12,7 +12,7 @@ Instead of having to wrap your data in function calls for reactivity, Syc will o
 
     shared.hello = "Goodbye!!!"
 
-Simply: Data bound to the registered variable is identical in all locations, removing the headache of data synchronization. 
+Syc philosophy: Data bound to the registered variable is identical between the server and all clients, removing the headache of data synchronization. 
 
 
 Examples

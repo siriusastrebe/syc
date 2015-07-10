@@ -9,7 +9,11 @@ The isomorphism and reactivity of Meteor, without the framework.
     var shared = {hello: 'world'}
     syc.sync('name', shared);
 
-It works under a simple principle: All data bound to the variable in question is identical in all locations, removing the headache of data synchronization. Any changes are instantly picked up and broadcast to clients. 
+Instead of having to wrap your data in function calls for reactivity, Syc will observe the change as it happens automatically (or via polyfills for older clients).
+
+    shared.hello = "Goodbye!!!"
+
+Simply: Data bound to the registered variable is identical in all locations, removing the headache of data synchronization. 
 
 Syc uses Object.observe() when available for responsiveness and performance, but will easily fall back onto a polyfill if unavailable.
 
@@ -40,7 +44,7 @@ The client can use `syc.list()` to see all existing syc variables.
     syc.list('name')
     -> {hello: 'world'}
     
-You can change the data on either the server or the client. Syc will observe the change as it happens and automatically communicate the new values.
+You can change the data on either the server or the client. Instead of having to wrap your data in function calls for reactivity, Syc will observe the change as it happens automatically (or via polyfills for older clients).
 
     shared.goodbye = "farewell!"
 

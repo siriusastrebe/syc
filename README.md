@@ -22,7 +22,8 @@ A side project proof of concept using Syc:
 
 http://treebeard.herokuapp.com/
 
-A simple chat application written in 
+A simple chat application demonstrating Syc, commented for your pleasure:
+
 https://github.com/siriusastrebe/Syc-Demo
 
 Documentation
@@ -148,7 +149,11 @@ By its nature, verifiers are avaiable only on the server side, and will trigger 
 
 When a client makes a change to the object, verifiers will be called *before* the change happens. For multiple verifiers, all must return true to accept the change. If accepted the change is applied, then watchers will be called. If any return false, the verifier drops the change, watchers will not be called, and the offending client is re-synced.
 
-Verifiers have a property `changes.change` which is not available to watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. *Advanced Tip*: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. <sub>**Warning** Careful, if the change references another Syc object, modifications to such pre-existing objects will apply even if the verifier function returns false.</sub>
+Verifiers have a property `changes.change` which is not available to watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. 
+
+*Advanced Tip*: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. 
+
+<sub>**Warning** Careful, if the change references another Syc object, modifications to such pre-existing objects will apply even if the verifier function returns false.</sub>
 
 ### Unverify
 

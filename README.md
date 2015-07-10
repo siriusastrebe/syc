@@ -151,8 +151,9 @@ When a client makes a change to the object, verifiers will be called *before* th
 
 Verifiers have a property `changes.change` which is not available to watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. 
 
-*Advanced Tip*: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. 
-<sub>**Warning** Careful, if the change references another Syc object, modifications to such pre-existing objects will apply even if the verifier function returns false.</sub>
+**Advanced Tip**: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. 
+
+<sub>**Warning** Careful when doing so, if the change references another registered Syc object or array, any changes you make will apply even if the verifier returns true.</sub>
 
 ### Unverify
 

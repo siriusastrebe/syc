@@ -125,7 +125,7 @@ You can also specify preferences:
 
 If either `remote` or `local` are set to false, the watcher will not trigger on changes from that origin.
 
-#### Recursive Watching
+##### Recursive Watching
 
     syc.watch_recursive(object, alertMe)
 
@@ -141,7 +141,7 @@ Alternatively you can manually watch each object/array returned by `Syc.ancestor
 
 Unwatching removes all watchers from that object. `func` is optional, and will selectively unwatch only that function from the object.
 
-#### Recursive Unwatching
+##### Recursive Unwatching
 
     syc.unwatch_recursive(object, [func]);
 
@@ -173,9 +173,13 @@ Recursively verifying a will apply a verifier on that variable and all of its de
 
 ### Unverify
 
-    syc.unverify(object, function)
+    syc.unverify(object, [function])
 
 Unwatching removes all watchers from that object. `func` is optional, and will selectively unwatch only that function from the object.
+
+##### Recursive Unwatching
+
+    syc.unwatch_recursive(object, [func]);
 
 ## Helper Functions (Server Side)
 

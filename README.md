@@ -165,7 +165,7 @@ Verifiers have a property `changes.change` which is not available to watchers. I
 
 <sub>**Warning**: Careful when doing so, if the change references another registered Syc object or array, any changes you make will apply *even if* the verifier returns **false**. To check for this, use </sub> `Syc.exists(object)`.
 
-#### Recursive Verification
+##### Recursive Verification
 
     Syc.verify_recursive(object, check);
     

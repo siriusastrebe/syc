@@ -12,7 +12,7 @@ Instead of having to wrap your data in function calls for reactivity, Syc will o
 
     shared.hello = "Goodbye!!!"
 
-Simply: Data bound to the registered variable is identical in all locations, removing the headache of data synchronization. 
+Syc philosophy: Data bound to the registered variable is identical between the server and all clients, removing the headache of data synchronization. 
 
 
 Examples
@@ -121,19 +121,27 @@ Watchers provide insight into an object whose property has been changed. If mult
 
 You can also specify preferences: 
     
-    syc.watch(object, alertMe, {remote: true, local: true, recursive: false})
+    syc.watch(object, alertMe, {remote: true, local: false})
 
-If `remote` or `local` are set to false, the watcher will not trigger on changes from that origin.
+If either `remote` or `local` are set to false, the watcher will not trigger on changes from that origin.
 
-Watching a variable will only watch that particular object or array. Setting `recursive` to `true` will apply a watcher on that variable and all of its descendant object/arrays. Any new descendant object will also be given the watcher, and descendants removed from the object will automatically be unwatched.
+##### Recursive Watching
 
-You can manually watch each object/array returned by `Syc.ancestors(object)` if you do not want new descendants to also be watched. 
+    syc.watch_recursive(object, alertMe)
+
+Recursively watching a will apply a watcher on that variable and all of its descendant object/arrays. Any new descendant object will also be given the watcher, and descendants removed from the object will automatically be unwatched. You can also provide preferences like on regular watchers:
+
+    syc.watch_recursive(object, alertMe, {remote: false})
 
 ### Unwatching
 
-    syc.unwatch(function, object);
+    syc.unwatch(object, [function]);
 
-Object is an optional parameter. If blank, then all watcher that utilizes the function will be deleted.
+Unwatching removes all watchers from that object. The `function` is optional, and will selectively unwatch only that function from the object.
+
+##### Recursive Unwatching
+
+    syc.unwatch_recursive(object, [function]);
 
 ## Verifiers (Server side)
 
@@ -149,17 +157,36 @@ By its nature, verifiers are avaiable only on the server side, and will trigger 
 
 When a client makes a change to the object, verifiers will be called *before* the change happens. For multiple verifiers, all must return true to accept the change. If accepted the change is applied, then watchers will be called. If any return false, the verifier drops the change, watchers will not be called, and the offending client is re-synced.
 
-Verifiers have a property `changes.change` which is not available to watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. 
+`changes` has the following properties available to it:
 
-**Advanced Tip**: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. 
+    changes.variable  // The variable whose property was modified.
+    changes.property  // The modified property's name.
+    changes.change    // A simulation of the proposed change. Can be modified within the verifier.
+    changes.oldValue  // What was previously held in `change.variable[change.property]`.
+    changes.type      // Any one of `add`, `update` or `delete`.
+    changes.local     // True if the change originated locally.
+    changes.remote    // True if the change was received from elsewhere.
 
-<sub>**Warning**: Careful when doing so, if the change references another registered Syc object or array, any changes you make will apply *even if* the verifier returns **false**.</sub>
+
+Verifiers have a property `changes.change` which operates differently from watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. 
+
+**Advanced Tip**: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. <sub>**Warning**: Careful when doing so, </sub> if the change references another registered Syc object or array, any changes you make will apply *even if* the verifier returns **false**. To check for this case, use `Syc.exists(object)`.
+
+##### Recursive Verification
+
+    Syc.verify_recursive(object, check);
+    
+Recursively verifying a will apply a verifier on that variable and all of its descendant object/arrays. Any new descendant object will also be given the verifier, and descendants removed from the object will automatically be unverified.
 
 ### Unverify
 
-    syc.unverify(function, object)
+    syc.unverify(object, [function])
 
-Object is an optional parameter. If blank, all verifiers that utilizes the function will be deleted.
+Unwatching removes all watchers from that object. `function` is optional, and will selectively unwatch only that function from the object.
+
+##### Recursive Unwatching
+
+    syc.unwatch_recursive(object, [function]);
 
 ## Helper Functions (Server Side)
 

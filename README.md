@@ -184,9 +184,9 @@ Recursively verifying a will apply a verifier on that variable and all of its de
 
 Unwatching removes all watchers from that object. `function` is optional, and will selectively unwatch only that function from the object.
 
-##### Recursive Unwatching
+##### Recursive Unverification
 
-    syc.unwatch_recursive(object, [function]);
+    syc.unverify_recursive(object, [function]);
 
 ## Helper Functions (Server Side)
 

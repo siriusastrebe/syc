@@ -16,16 +16,13 @@ Syc = {
     connected.push(socket);
 
     socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
-    socket.on('syc-reset-request', function (data) { Reset(socket, data)}) 
 
-    Reset(socket);
+    Welcome(socket);
     
-    if (Object.observe)
-      Syc.traversal_interval = Syc.integrity_interval;
-    else
-      Syc.traversal_interval = Syc.polyfill_interval;
-
-    if (!mapping_timer) mapping_timer = setInterval(Traverse, Syc.traversal_interval);
+    if (!Syc.initialized) {
+      Syc.initialized = true;
+      setInterval(Traverse, Syc.polyfill_interval);
+    }
   },
 
   sync: function (name, variable) {
@@ -34,7 +31,7 @@ Syc = {
     if (variable === undefined)
       var variable = {};
     if (Type(variable) !== 'object' && Type(variable) !== 'array')
-      throw "Syc error: Can't synchronize a stand-alone variable. Use an object or an array instead."
+      throw "Syc error: Can't synchronize a stand-alone variable. Put the data as a property of an object or an array instead."
 
     New_Variable(name, variable);
 
@@ -63,8 +60,12 @@ Syc = {
   watch:     Watch,
   Unwatch:   Unwatch,
   unwatch:   Unwatch,
+  Unwatch_Recursive:   Unwatch_Recursive,
+  unwatch_recursive:   Unwatch_Recursive,
   Verify:    Verify,
   verify:    Verify,
+  Verify_Recursive:    Verify_Recursive,
+  verify_recursive:    Verify_Recursive,
   Type: Type,
   type: Type,
 
@@ -75,10 +76,11 @@ Syc = {
   objects: {},
   callbacks: {},
 
+  initialized: false,
   polyfill_interval: 260,
-  integrity_interval: 36000,
   buffer_delay: 20,
-  reset_limit: 8
+//  integrity_interval: 36000,
+//  reset_limit: 8
 }
 
                 
@@ -193,6 +195,9 @@ function Ancestors (variable, visited, objects) {
       visited = visited || {},
       objects = objects || [];
 
+  if (Syc.Type(visited) === 'array')
+    visited = Array_To_Dictionary(visited);
+
   if (visited[id]) 
     return;
   else
@@ -208,6 +213,15 @@ function Ancestors (variable, visited, objects) {
   }
 
   return objects;
+
+  function Array_To_Dictionary (objects) {
+    var dick = {};
+    for (var o in objects) {
+      var id = objects[o]['syc-object-id'];
+      dick[id] = objects[o];
+    }
+    return dick;
+  }
 }
 
 function Exists (object) {
@@ -264,16 +278,17 @@ function Observed (changes) {
         oldValue = changes[change].oldValue,
         id = object['syc-object-id'];
 
-    if (observable && observe_lock[id]) {
-      delete observe_lock[id]; return
-    }
+    // Object.observe will also trigger on changing array length. Ignore this.
+    if (Type(object) === 'array' && property === 'length') continue;
 
-    var changes;
-    changes = Describe(changed, object, property);
+    // Do not trigger when receiving changes from elsewhere.
+    if (observable && observe_lock[id]) { delete observe_lock[id]; return }
+
+    var description = Describe(changed, object, property);
 
     Map_Property(object, property);
 
-    var data = { value: id, type: type, property: property, changes: changes }
+    var data = { value: id, type: type, property: property, changes: description }
 
     if (observe_redirect[id]) {
       Emit('syc-object-change', data, observe_redirect[id]);
@@ -381,8 +396,7 @@ function Receive_Change (data, socket) {
   var variable = Syc.objects[id];
   
   if (variable === undefined) {
-    console.warn("Received changes to an unknown object: " + id + ". Resyncing client.");
-    Reset(Socket);
+    console.warn("Received changes to an unknown object: " + id + ".");
   }
 
   var oldValue = variable[property],
@@ -601,6 +615,18 @@ function Recurrable (type) {
 
 // ---- ---- ---- ----  Requests  ---- ---- ---- ----
 
+function Welcome (socket) {
+  for (var name in Syc.variables) {
+    var id = Syc.variables[name],
+        variable = Syc.objects[id];
+
+    Emit('syc-variable-new', {name: name, value: id, description: Describe_Recursive(variable)}, [socket]);
+  }
+
+  Emit('syc-welcome', {}, [socket]);
+}
+
+/*
 function Reset (socket, data) { 
   var described = {},
       sid = socket.id,
@@ -646,6 +672,7 @@ function Reset (socket, data) {
   }
   
 }
+*/
 
 // ---- ---- ---- ----  Watchers  ---- ---- ---- ----
 function Watch (object, func, preferences) {
@@ -654,6 +681,20 @@ function Watch (object, func, preferences) {
 
 function Verify (object, func, preferences) {
   Record(object, func, preferences, 'verify');
+}
+
+function Watch_Recursive (object, func, preferences) {
+  if (Syc.Type(preferences) !== 'object') preferences = {};
+  preferences.recursive = true;
+
+  Watch(target, func, preferences);
+}
+
+function Verify_Recursive (object, func, preferences) {
+  if (Syc.Type(preferences) !== 'object') preferences = {};
+  preferences.recursive = true;
+
+  Verify(target, func, preferences);
 }
 
 function Record (object, func, preferences, kind) { 
@@ -666,9 +707,10 @@ function Record (object, func, preferences, kind) {
   var local = true,
       remote = true,
       recursive = false,
-      id = object['syc-object-id'];
+      id = object['syc-object-id'],
+      root;
 
-  if (preferences) {
+  if (kind !== 'verify' && preferences) {
     if (preferences.local && preferences.remote) {
       local = true; remote = true;
     } else if (preferences.local || preferences.remote === false) {
@@ -693,6 +735,8 @@ function Record (object, func, preferences, kind) {
   }
 
   if (recursive) {
+    root = object;
+
     var ancestors = Ancestors(object);
     ancestors.forEach ( function (object) { 
       var id = object['syc-object-id'];
@@ -707,14 +751,14 @@ function Record (object, func, preferences, kind) {
     });
   }
 
-  function Wrapper (change) { 
+  function Wrapper (change, socket) { 
     var result;
     if (local && !remote) { 
-       result = Local_Only(change);
+       result = Local_Only(change, socket);
     } else if (remote && !local) { 
-       result = Remote_Only(change);
+       result = Remote_Only(change, socket);
     } else if (remote && local) {
-       result = Both(change);
+       result = Both(change, socket);
     }
 
     if (recursive) {
@@ -724,23 +768,23 @@ function Record (object, func, preferences, kind) {
     return result;
   }
 
-  function Local_Only (change) { 
+  function Local_Only (change, socket) { 
     if (change.local && !change.remote) {
-      try { return func(change); }
+      try { return func(change, socket); }
       catch (e) { console.error("Syc." + kind + "() callback error: ", e, e.stack) }
     }
   }
 
-  function Remote_Only (change) { 
+  function Remote_Only (change, socket) { 
     if (change.remote && !change.local) {
-      try { return func(change); }
+      try { return func(change, socket); }
       catch (e) { console.error("Syc." + kind + "() callback error: ", e, e.stack) }
     }
   }
 
-  function Both (change) { 
+  function Both (change, socket) { 
     if (change.remote || change.local) { 
-      try { return func(change); }
+      try { return func(change, socket); }
       catch (e) { console.error("Syc." + kind + "() callback error: ", e, e.stack) }
     }
   }
@@ -752,16 +796,16 @@ function Record (object, func, preferences, kind) {
         new_type = Syc.Type(new_value);
 
     if (old_type === 'array' || old_type === 'object') { 
-      var ancestors = Ancestors(old_value);
+      var referenced = Ancestors(root),
+          unreferenced = Ancestors(old_value, referenced);
 
-      ancestors.forEach( function (object) { 
-        var id = object['syc-object-id'];
-
-        if (kind === 'verify') 
-          delete Syc.verifies[id][identifier];
-        else 
-          delete Syc.watchers[id][identifier];
-      });
+      for (obj in unreferenced) {
+        if (kind === 'verify') {
+          Unverify(unreferenced[obj]);
+        } else {
+          Unwatch(unreferenced[obj]);
+        }
+      }
     }
 
     if (new_type === 'array' || new_type === 'object') {
@@ -777,62 +821,81 @@ function Record (object, func, preferences, kind) {
   }
 }
 
-function Unwatch (func, object) {
+function Unrecord (object, func, kind) {
   // sanitizing
-  var typef = Type(func);
-  if (typef !== 'function') throw "syc error: syc.unwatch() takes function. You gave " +typef+ ".";
-  if (object) { 
-    var typeo = Type(object)
-    if (typeo !== 'object' && typeo !== 'array') throw "syc error: syc.unwatch() takes an optional object as a second argument. You provided a " +typeo+ "."; 
-    if (!Exists(object)) throw "syc error: in syc.unwatch(function, object), object must be a variable registered by syc.";
-  }
+  var typeO = Type(object)
+  var typeF = Type(func);
 
-  // Unwatch
-  var identifier = Hash_Code(String(func));
+  if (typeO !== 'object' && typeO !== 'array') throw "Syc error: Syc." +kind+ " takes an object/array as the first argument. You provided a " +typeO+ ".";
+  if (!Syc.exists(object)) throw "Syc error: in Syc." +kind+ "(object/array, [function]), object/array must be a variable registered by Syc."
+  if (typeF !== 'undefined' && typeF !== 'function') throw "Syc error: Syc." +kind+ " takes an optional function as the second argument. You provided a " +typeF+ ".";
 
-  if (object) {
-    var id = object['syc-object-id'];
+  var id = object['syc-object-id'],
+      record;
 
-    Remove(id, identifier);
+  if (kind === 'unwatch')
+    record = Syc.watchers;
+  else  if (kind === 'unveriy')
+    record = Syc.verifiers;
+  
+  if (func) { 
+    if (record[id] && record[id][identifier])
+      delete record[id][identifier];
+    if (empty(record[id])) 
+      delete record[id];
   } else {
-    for (id in Syc.watchers) { 
-      Remove (id, identifier);
-    }
+    if (record[id])
+      delete record[id];
   }
 
-  function Remove (id, identifier) { 
-    if (Syc.watchers[id][identifier])
-      delete Syc.watchers[id][identifier];
+  function empty (object) { 
+    for (property in object) {
+      return false
+    }
+    return true;
   }
 }
 
-function Unverify (func, object) {
-  // sanitizing
-  var typef = Type(func);
-  if (typef !== 'function') throw "syc error: syc.unverify() takes function. You gave " +typef+ ".";
-  if (object) { 
-    var typeo = Type(object)
-    if (typeo !== 'object' && typeo !== 'array') throw "syc error: syc.unverify() takes an optional object as a second argument. You provided a " +typeo+ "."; 
-    if (!Exists(object)) throw "syc error: in syc.unverify(function, object), object must be a variable registered by syc.";
-  }
+function Unwatch (object, func) {
+  Unrecord(object, func, 'unwatch');
+}
 
-  // Unverify
-  var identifier = Hash_Code(String(func));
+function Unverify (object, func) {
+  Unrecord(object, func, 'unverify');
+}
 
-  if (object) {
-    var id = object['syc-object-id'];
+function Unverify_Recursive (object, func) { 
+  // Sanitize
+  var typeO = Type(object);
+  var typeF = Type(func);
 
-    Remove(id, identifier);
-  } else {
-    for (id in Syc.verifier) { 
-      Remove (id, identifier);
-    }
-  }
+  if (typeO !== 'object' && typeO !== 'array') throw "Syc error: Syc.unverify_recursive takes an object as the first argument. You provided a " +typeO+ ".";
+  if (!Syc.exists(object)) throw "Syc error: in Syc.unverify_recursive(object/array, [function]), object/array must be a variable registered by Syc."
+  if (typeF !== 'undefined' && typeF !== 'function') throw "Syc error: Syc.unverift_recursive() takes an optional function as the second argument. You provided a " +typeF+ ".";
 
-  function Remove (id, identifier) { 
-    if (Syc.verifiers[id][identifier])
-      delete Syc.verifiers[id][identifier];
-  }
+  // Unverify_Recursive
+  var ancestors = Ancestors(object);
+
+  ancestors.forEach(function (ancestor) { 
+    Unverify(ancestor, func);
+  });
+}
+
+function Unwatch_Recursive (object, func) { 
+  // Sanitize
+  var typeO = Type(object);
+  var typeF = Type(func);
+
+  if (typeO !== 'object' && typeO !== 'array') throw "Syc error: Syc.unverify_recursive takes an object as the first argument. You provided a " +typeO+ ".";
+  if (!Syc.exists(object)) throw "Syc error: in Syc.unverify_recursive(object/array, [function]), object/array must be a variable registered by Syc."
+  if (typeF !== 'undefined' && typeF !== 'function') throw "Syc error: Syc.unverify_recursive() takes an optional function as the second argument. You provided a " +typeF+ ".";
+
+  // Unwatch_Recursive
+  var ancestors = Ancestors(object);
+
+  ancestors.forEach(function (ancestor) { 
+    Unwatch(ancestor, func);
+  });
 }
 
 
@@ -923,18 +986,20 @@ function Traverse () {
   }
 
   // Integrity check
+  /* Commenting out cuz integrity checking is half-assed
   for (var sid in reset_counter) {
     if (reset_counter[sid] > 0) reset_counter[sid] -= 1;
     else delete reset_counter[sid];
   }
 
-  hash_timer += Syc.traversal_interval;
+  hash_timer += Syc.polyfill_interval;
   if (hash_timer >= Syc.integrity_interval) {
     hash_timer -= Syc.integrity_interval;
     var hash = Generate_Hash();
 
     Broadcast('syc-integrity-check', {hash: hash});
   }
+  */
 }
 
 function Map (variable, name, path) {
@@ -1042,16 +1107,15 @@ function Generate_Hash () {
   }
 
   return hash;
-
 }
 
-function Hash_Code (string) {
+function hash_code (string) {
   var hash = 0, i, chr, len;
   if (string.length == 0) return hash;
   for (var i = 0, len = string.length; i < len; i++) {
-    chr   = string.charCodeAt(i);
+    chr   = string.charcodeat(i);
     hash  = ((hash << 5) - hash) + chr;
-    hash |= 0; // Convert to 32bit integer
+    hash |= 0; // convert to 32bit integer
   }
   return hash;
 }

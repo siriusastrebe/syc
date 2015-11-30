@@ -1,0 +1,23 @@
+{
+  "name": "syc",
+  "version": "1.0.1",
+  "description": "A data synchronization library. Create a variable on the server and it will synchronize changes instantaneously to the client.",
+  "main": "server/syc.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/siriusastrebe/syc.git"
+  },
+  "keywords": [
+    "reactive",
+    "synchronization",
+    "communication",
+    "meteor",
+    "observe"
+  ],
+  "author": "Sirius A Strebe <siriusastrebe@gmail.com> (https://github.com/siriusastrebe)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/siriusastrebe/syc/issues"
+  },
+  "homepage": "https://github.com/siriusastrebe/syc"
+}

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html ng-app="syctest">
+<head>
+    <title>Syc training grounds</title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <script type='text/javascript' src='/socket.io/socket.io.js'></script>
+    <script type='text/javascript' src='/syc.js'></script>
+    <script type='text/javascript' src='/angular.js'></script>
+    <script type='text/javascript' src='/public.js'></script>
+    <style type='text/css'>
+      .indent {
+        padding-left: 24px;
+        display: block;
+      }
+
+      .info { 
+        float: left;
+      }
+
+      .recurrable {
+        color: blue;
+      }
+
+      .syc-id {
+        color: gray;
+      }
+      .syc-id:visited { 
+        color: aqua;
+      }
+ 
+      .primitive {
+        color: red;
+      }
+
+      .test { 
+        float: right;
+      }
+
+      .testing { 
+        background-color: #9F9;
+      }
+
+      .enabled {
+        background-color: #6F6;
+      }
+
+      .results, .actions {
+        border: 1px solid black;
+        width: 300px;
+        height: 100px;
+        margin-top: 15px;
+      }
+
+      .test button { 
+        width: 300px;
+        height: 80px;
+      }
+    </style>
+</head>
+<body ng-controller="ctrl">
+    <h1 id='title'>Hello</h1>
+
+    <ul class="info indent" ng-init="unmark_all()">
+      <li ng-repeat="(key, value) in data track by $index" ng-include="'syc-display'"></li>
+    </ul>
+
+    <div class="test">
+      <button type="button" ng-class="{waiting: testing !== undefined, enabled: role !== undefined}" ng-click="start()">Start Test</button>
+      <div class="results">{{results}}</div>
+      <div class="actions">{{actions}}</div>
+    </div>
+
+
+    <script type="text/ng-template" id="syc-display">
+      <div ng-if="recurrable(value)">
+        <span class="recurrable">
+          <span class="key">{{key}}</span>
+          (<span class="type" ng-bind="type(value)"></span>)
+          <a name="{{id(value)}}" href="#{{id(value)}}">[<span class="syc-id" ng-bind="id(value)"></span>]</a>
+        </span>
+        <ul class="indent">
+          <li ng-repeat="(key, value) in value track by $index" ng-include="'syc-display'"></li>
+        </ul>
+      </div>
+
+      <div ng-if="!recurrable(value)">
+        <span class="primitive">
+          <span class="key">{{key}}</span> (<span class="type" ng-bind="type(value)"></span>): <span class="value">{{value}}</span>
+        </span>
+      </div>
+
+    </script>
+</body>
+</html>

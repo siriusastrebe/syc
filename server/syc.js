@@ -13,11 +13,10 @@ var reset_counter = {};
 
 Syc = {
   Connect: function (socket) { 
-    connected.push(socket);
-
-    socket.on('syc-object-change', function (data) { Receive_Change(data, socket)}) 
+    socket.on('syc-message-parcel', function (data) { Receive_Message(data, socket)}) 
 
     Welcome(socket);
+    connected.push(socket);
     
     if (!Syc.initialized) {
       Syc.initialized = true;
@@ -26,28 +25,46 @@ Syc = {
   },
 
   sync: function (name, variable) {
-    if (variable instanceof Syc.sync)
-      var variable = this; 
-    if (variable === undefined)
-      var variable = {};
+    if (Type(name) !== 'string') throw "Syc error: Syc.sync(name, variable) requires a string as the first argument."
+    if (variable === undefined) var variable = {};
     if (Type(variable) !== 'object' && Type(variable) !== 'array')
-      throw "Syc error: Can't synchronize a stand-alone variable. Put the data as a property of an object or an array instead."
+      throw "Syc error: Syc.sync(name, variable) can't synchronize a primitive value, and takes an object or array as the second parameter. "
 
     New_Variable(name, variable);
-
     return variable;
   },
 
-  serve: function (name) {
-    if (variable instanceof Syc.sync)
-      var variable = this; 
-    if (variable === undefined)
-      var variable = {};
+  serve: function (name, variable) { 
+    if (Type(name) !== 'string') throw "Syc error: Syc.serve(name, variable) requires a string as the first argument."
+    if (variable === undefined) var variable = {};
     if (Type(variable) !== 'object' && Type(variable) !== 'array')
-      throw "Syc error: Can't synchronize a stand-alone variable. Use an object or an array instead."
+      throw "Syc error: Syc.serve(name, variable) can't serve a primitive value, and takes an object or array as the second parameter. "  
 
-    New_Variable(name, this, true);
+    Create_Group(variable, name, {readonly: true, global: true});
+    New_Variable(name, variable, {readonly: true, group: name});
+    return variable; 
   },
+
+  groupsync: function (name, varialbe, sockets) { 
+    if (Type(name) !== 'string') throw "Syc error: Syc.groupsync(name, variable, [sockets]) requires a string as the first argument."
+    if (variable === undefined) var variable = {};
+    if (Type(variable) !== 'object' && Type(variable) !== 'array')
+      throw "Syc error: Syc.groupsync(name, variable, [sockets]) can't synchronize a primitive value, and takes an object or array as the second parameter. "  
+
+    Create_Group(variable, name, {sockets: sockets});
+    New_Variable(name, variable, {readonly: false, group: name});
+  },
+
+  groupserve: function (name, variable, sockets) { 
+    if (Type(name) !== 'string') throw "Syc error: Syc.groupserve(name, variable, [sockets]) requires a string as the first argument."
+    if (variable === undefined) var variable = {};
+    if (Type(variable) !== 'object' && Type(variable) !== 'array')
+      throw "Syc error: Syc.groupserve(name, variable, [sockets]) can't serve a primitive value, and takes an object or array as the second parameter. "  
+
+    Create_Group(variable, name, {sockets: sockets});
+    New_Variable(name, variable, {readonly: true, group: name});
+  },
+
 
   connect:   function (socket) { return Syc.Connect(socket) },
   List:      List,
@@ -69,11 +86,15 @@ Syc = {
   Type: Type,
   type: Type,
 
+  Add:       Add,
+  add:       Add,
+
   watchers: {},
   verifiers: {},
 
   variables: {},
   objects: {},
+  groups: {},
   callbacks: {},
 
   initialized: false,
@@ -85,29 +106,31 @@ Syc = {
 
                 
 // ---- ---- ---- ----  Helper  ---- ---- ---- ----
-function Emit (title, data, sockets) { 
+function Emit (title, data, socket) { 
   // Sanitizing
-  if (Syc.Type(sockets) !== 'array') throw "Syc error: Emit(title, data, sockets), sockets must be an array."
+  if (socket.id === undefined) throw "Syc error: Emit(title, data, socket), socket must be a socket."
   if (data[0] && data[0].hasOwnProperty('emit')) 
-    throw "Syc error: Emit(title, data, sockets) can't take sockets as a second parameter."
+    throw "Syc error: Emit(title, data, socket) can't take a socket as a second parameter."
 
   // Emitting
-  var audience = sockets || connected;
-
-  Buffer(title, data, audience)
+  Buffer(title, data, [socket])
 }
 
-function Broadcast (title, data, sender) { 
+function Broadcast (title, data, group, sender) { 
   // Sanitizing
-  if (data.hasOwnProperty('emit')) throw "Syc error: Emit(title, data, sockets) can't take sockets as a second parameter."
+  if (data.hasOwnProperty('emit')) throw "Syc error: Broadcast(title, data, sockets) can't take sockets as a second parameter."
+  if (group && Syc.groups[group] === undefined) throw "Syc error: can't find a group by the provided name " + group + ".";
 
-  // Emitting
-  var audience = connected.slice(0), // create a clone so we don't tamper the original
-      index = audience.indexOf(sender);
+  // Broadcasting
+  if (group) 
+    var audience = Syc.groups[group].sockets.slice(0); // create a clone blah blah
+  else 
+    var audience = connected.slice(0); // create a clone so we don't tamper the original
 
-  if (index !== -1) { 
+  var index = audience.indexOf(sender);
+
+  if (index !== -1) 
       audience.splice(index, 1); // Ommit the sender
-   }
   
   Buffer(title, data, audience);
 }
@@ -124,14 +147,13 @@ function Buffer (title, data, audience) {
         buffers.forEach( function (message) { 
           message.audience.forEach (function (member) { 
             var sid = member.id;
-            
+
             if (sockets[sid]) sockets[sid].push([message.title, message.data]);
             else sockets[sid] = [member, [message.title, message.data]];
           });
         });
 
         for (var sid in sockets) {
-          // TODO: This is kinda a hilarious hack...
           var socket = sockets[sid][0];
           var messages = sockets[sid].splice(1);
 
@@ -152,16 +174,13 @@ function Buffer (title, data, audience) {
   }
 }
 
+
 function List (name) {
   // Sanitizing
   var type = typeof name;
   if (name) { 
     if (type !== 'string') 
       throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
-  }
-  if (callback) { 
-    var type = typeof callback;
-    if (type !== "function") throw "Syc error: The second argument you provided for Syc.list(string, callback) is " +type+ " but needs to be a function."
   }
 
   // listing
@@ -174,13 +193,6 @@ function List (name) {
     return all;
   } else {
     var obj = Syc.objects[Syc.variables[name]];
-    if (obj === undefined) {
-      if (!Syc.callbacks[name]) Syc.callbacks[name] = [];
-      Syc.callbacks[name].push(callback);
-    } else if (callback) { 
-      callback(obj);
-    }
-
     return obj;
   }
 }
@@ -237,54 +249,123 @@ function Exists (object) {
 }
 
 
+// ---- ---- ---- ----  Groups and Access Control ---- ---- ---- ---- //
+function Create_Group (variable, name, options) {
+  // Sanitize
+  if (sockets && Type(sockets) !== 'array') throw "Syc error: Creating a group takes an array of sockets as an optional fourth parameter. You provided a " + Type(sockets) + ".";
 
-/* ---- ---- ---- ----  Observing and New Variables  ---- ---- ---- ---- */
-function New_Variable (name, variable, one_way) { 
-  var one_way = one_way || false;
+  var readonly, global, sockets;
+
+  if (options) { 
+    readonly = options.readonly;
+    global = options.global;
+    sockets = options.sockets;
+  }
+
+  if (sockets === undefined || global === true) 
+    sockets = connected;
+
+  Syc.groups[name] = { readonly: readonly, global: global, sockets: [], root: variable };
+
+  if (!global) { 
+    for (var s in sockets) {
+      Add(name, sockets[s]);
+    }
+  }
+}
+
+function Write_Permissions (group, socket) { 
+  if (Syc.groups[group] === undefined) return true;    // throw "Syc error: Syc.Write_Permission(groupname, socket), can't find a group by the provided groupname " + group + ".";
+
+  if (Syc.groups[group].readonly) 
+    return false;
+  else if (Syc.groups[group].global === true) 
+    return true
+  else 
+    return (Syc.groups[group].sockets.indexOf(socket) !== -1);
+}
+
+function Read_Permissions (group, socket) { 
+  if (Syc.groups[group] === undefined) return true;    //throw "Syc error: Syc.Read_Permission(groupname, socket), can't find a group by the provided groupname " + group + ".";
+
+  if (Syc.groups[group].global === true) 
+    return true
+
+  if (group) 
+    return Syc.groups[group].sockets.indexOf(socket) !== -1;
+
+  else 
+    return true
+}
+
+function Add (group, socket) {
+  if (Syc.groups[group] === undefined) throw "Syc error: Syc.add(groupname, socket), can't find a group by the provided groupname " + group + ".";
+  if (socket.id === undefined) throw "Syc error: Syc.add(groupname, socket) did not find a socket as the second parameter.";
+
+  Syc.groups[group].sockets.push(socket);
+
+  var root = Syc.groups[group].root,
+      id = root['syc-object-id'];
+
+  var description = Describe_Recursive(root, group);
+
+  Emit('syc-variable-new', {name: group, value: id, description: description}, socket);
+}
+
+// TODO: Removal of group members
+
+
+// ---- ---- ---- ----  Observing and New Variables  ---- ---- ---- ---- //
+function New_Variable (name, variable, preferences) { 
+  var readonly = false,
+      group,
+      sockets;
+
+  if (preferences) {
+    readonly = preferences.readonly;
+    group = preferences.group;
+  }
 
   if (name in Syc.variables) throw "There is already a syc variable by the name " +name+ ".";
 
   if (!variable['syc-object-id']){ 
-    var id = Meta(variable, one_way),
-        description = Describe_Recursive(variable);
+    var id = Meta(variable, group),
+        description = Describe_Recursive(variable, group);
 
     Syc.variables[name] = id;
     Map_Object(variable);
-    Broadcast('syc-variable-new', {name: name, value: id, description: description});
+    Broadcast('syc-variable-new', {name: name, value: id, description: description}, group);
   } else { 
-    var description = Describe(variable),
+    // TODO: This is allowing Syc variables to be assigned to one another.
+    var description = Describe(variable, group),
         id = description.value;
 
     Syc.variables[name] = id;
-    Broadcast('syc-variable-new', {name: name, value: id, description: description});
-  }
-
-  var callbacks = Syc.callbacks[name];
-  if (callbacks) {
-    while (callbacks.length > 0) { 
-      var callback = callbacks.pop();
-      callback(variable);
-    }
+    Broadcast('syc-variable-new', {name: name, value: id, description: description}, group);
   }
 }
 
 
 function Observed (changes) { 
+  var watcher_queue = []; 
+
   for (var change in changes) { 
     var object = changes[change].object,
         property = changes[change].name,
         changed = object[property],
         type = Standardize_Change_Type(changes[change].type),
         oldValue = changes[change].oldValue,
-        id = object['syc-object-id'];
+        id = object['syc-object-id'],
+        group = object['syc-group'];
 
-    // Object.observe will also trigger on changing array length. Ignore this.
+    // Object.observe will also trigger on changing array length. Ignore this case.
     if (Type(object) === 'array' && property === 'length') continue;
 
     // Do not trigger when receiving changes from elsewhere.
-    if (observable && observe_lock[id]) { delete observe_lock[id]; return }
+    if (Locked(id, property, true))
+      continue;
 
-    var description = Describe(changed, object, property);
+    var description = Describe(changed, group);
 
     Map_Property(object, property);
 
@@ -293,10 +374,15 @@ function Observed (changes) {
     if (observe_redirect[id]) {
       Emit('syc-object-change', data, observe_redirect[id]);
     } else {
-      Broadcast('syc-object-change', data);
+      Broadcast('syc-object-change', data, group);
     }
 
-    Awake_Watchers(true, object, property, type, oldValue);
+    watcher_queue.push([object, property, type, oldValue]);
+  }
+
+  for (var i in watcher_queue) { 
+    var x = watcher_queue[i];
+    Awake_Watchers(true, x[0], x[1], x[2], x[3]);
   }
 }
 
@@ -310,32 +396,29 @@ function Standardize_Change_Type (type) {
 }
 
 
-/* ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- */
-function Describe (variable, parent, pathname) { 
+// ---- ---- ---- ----  Describing and Resolving  ---- ---- ---- ---- //
+function Describe (variable, group) { 
   var type = Type(variable),
       value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
     if (value === undefined) { 
       var properties = {};
-      var one_way = parent['syc-one-way'];
 
-      value = Meta(variable, one_way);
+      value = Meta(variable, group);
 
       for (var property in variable) {
-        properties[property] = Describe(variable[property], variable, property);
+        properties[property] = Describe(variable[property], group);
       }
 
       Map_Object(variable);
 
-      return {type: type, value: value, properties: properties, one_way: one_way};
+      return {type: type, value: value, properties: properties, group: group};
     } else { 
-      if (parent) { 
-        var one_way = variable['syc-one-way'];
-        Variable_Compatibility(variable, parent, pathname);
-      }
+      if (group && variable['syc-group'] !== group)
+        throw "Syc error: Variables belonging to one group cannot be referenced by other groups."
 
-      return {type: type, value: value, one_way: one_way};
+      return {type: type, value: value, group: group};
     }
   } else { 
     return {type: type, value: value};
@@ -343,19 +426,17 @@ function Describe (variable, parent, pathname) {
 }
 
 
-function Describe_Recursive (variable, visited, parent, pathname) { 
+function Describe_Recursive (variable, group, visited) { 
   var type = Type(variable),
       value = Evaluate(type, variable);
 
   if (Recurrable(type)) { 
-    var one_way = variable['syc-one-way'];
-
     if (value === undefined) {
-      one_way = parent['syc-one-way'];
-      value = Meta(variable, one_way);
-    } else if (parent) { 
-      Variable_Compatibility(variable, parent, pathname);
+      value = Meta(variable, group);
     }
+
+    if (group && variable['syc-group'] !== group)
+      throw "Syc error: Variables belonging to one group cannot be referenced by other groups."
 
     if (visited === undefined) var visited = [];
     if (visited.indexOf(value) !== -1) return {type: type, value: value};
@@ -364,34 +445,31 @@ function Describe_Recursive (variable, visited, parent, pathname) {
     var properties = {};
 
     for (var property in variable) {
-      properties[property] = Describe_Recursive(variable[property], visited, variable, property);
+      properties[property] = Describe_Recursive(variable[property], group, visited);
     }
 
     Map_Object(variable);
 
-    return {type: type, value: value, properties: properties, one_way: one_way};
+    return {type: type, value: value, properties: properties};
   } else { 
     return {type: type, value: value};
   }
 }
 
-
-
-function Variable_Compatibility (variable, parent, pathname) { 
-  if (variable['syc-one-way'] !== parent['syc-one-way']) {
-    delete parent[pathname];
-    throw "Syc error: Objects assigned to one-way served variables cannot be mixed with two-way synced objects."
+function Receive_Message (data, socket) { 
+  for (var index in data) { 
+    var message = data[index];
+    if (message.title === 'syc-object-change')
+      Receive_Change(message.data, socket); 
   }
 }
-
 
 function Receive_Change (data, socket) { 
   console.log(data)
   var type     = data.type,
       id       = data.value,
-      property = data.property
+      property = data.property,
       changes  = data.changes;
-
 
   var variable = Syc.objects[id];
   
@@ -400,27 +478,32 @@ function Receive_Change (data, socket) {
   }
 
   var oldValue = variable[property],
-      description = Describe(variable[property]);
+      group = variable['syc-group'],
+      description = Describe(variable[property], group);
 
-  if (variable['syc-one-way'] === true) { 
-    console.warn('Syc warning: Received a client\'s illegal changes to a one-way variable... Discarding changes and syncing the client.');
+  console.log("Variable belongs to group: " + group + ".");
+  console.log("Write permission for this group: " + Write_Permissions(group, socket) + ".");
+
+
+  if (group && !Write_Permissions(group, socket)) { 
+    console.warn('Syc warning: Received a client\'s illegal changes to a restricted variable... Discarding changes and syncing the client.');
     Resync(type, id, property, description, socket);
   }
 
   var simulations = [];
 
-  var simulated_root = Simulate_Changes(changes, simulations); 
+  var simulated_root = Simulate_Changes(changes, group, simulations); 
   var change = {change: simulated_root};
   var verified = Awake_Verifiers(change, variable, property, type, oldValue, socket);
 
   if (verified) { 
     Change_Property(type, variable, property, change.change);
 
-    var description = Describe_Simulation(variable[property]);
+    var description = Describe_Simulation(variable[property], group);
 
     Detect_Changes(variable, property, data.changes, simulations, socket);
 
-    Broadcast('syc-object-change', { value: id, type: type, property: property, changes: description }, socket);
+    Broadcast('syc-object-change', { value: id, type: type, property: property, changes: description }, group, socket);
 
     Awake_Watchers(false, variable, property, type, oldValue, socket);
   } else {
@@ -429,7 +512,7 @@ function Receive_Change (data, socket) {
   }
 
 
-  function Describe_Simulation (variable) {
+  function Describe_Simulation (variable, group) {
     var type = Type(variable),
         value = Evaluate(type, variable);
 
@@ -442,11 +525,11 @@ function Receive_Change (data, socket) {
         var properties = {}
 
         for (var property in variable) {
-          properties[property] = Describe_Simulation(variable[property]);
+          properties[property] = Describe_Simulation(variable[property], group);
         }
 
-        Meta(variable, false, id);
-
+        Meta(variable, group, id);
+      
         return {type: type, value: id, properties: properties}
       }
     } else {
@@ -464,7 +547,7 @@ function Receive_Change (data, socket) {
 
       var data = {value: id, type: 'update', property: property, changes: changes }
 
-      Emit('syc-object-change', data, [socket]);
+      Emit('syc-object-change', data, socket);
     }
 
     objects.forEach( function (object) {
@@ -484,13 +567,13 @@ function Receive_Change (data, socket) {
   function Change_Property (type, object, property, value) {
     var id = object['syc-object-id'];
 
-    observe_lock[id] = true;
+    Lock(id, property);
 
     if (type === 'delete') {
-      if (object[property]) {
+      if (object[property] !== undefined) {
         delete variable[property];
       } else {
-        observe_lock[id] = false;
+        Locked(id, property, true);
       }
     } else if (type === 'add' || type === 'update') {
       object[property] = value;
@@ -505,11 +588,11 @@ function Receive_Change (data, socket) {
     var description = Describe(variable[property], variable, property);
 
     if (type === 'add') {
-      Emit('syc-object-change', {type: 'delete', value: id, property: property}, [socket]);
+      Emit('syc-object-change', {type: 'delete', value: id, property: property}, socket);
     } else if (type === 'delete') {
-      Emit('syc-object-change', {type: 'add', value: id, property: property, changes: description}, [socket]);
+      Emit('syc-object-change', {type: 'add', value: id, property: property, changes: description}, socket);
     } else if (type === 'update') {
-      Emit('syc-object-change', {type: 'update', value: id, property: property, changes: description}, [socket]);
+      Emit('syc-object-change', {type: 'update', value: id, property: property, changes: description}, socket);
     }
   }
 
@@ -521,7 +604,7 @@ function Receive_Change (data, socket) {
     });
   }
 
-  function Simulate_Changes (changes, simulated_objects) { 
+  function Simulate_Changes (changes, group, simulated_objects) { 
     var type = changes.type,
         variable,
         properties,
@@ -534,8 +617,8 @@ function Receive_Change (data, socket) {
 
       if (id in Syc.objects) { 
         var object = Syc.objects[id];
-        if (object['syc-one-way']) { 
-          console.warn('Syc warning: A client\'s attempted to reference a one-way variable from a two-way variable. Ignoring client request.');
+        if (object['syc-group'] && group !== object['syc-group']) { 
+          console.warn('Syc warning: A client is attempting to assign a variable belonging to one group to a variable belonging to another group. Ignoring client request.');
         } else {
           return object;
         }
@@ -544,9 +627,11 @@ function Receive_Change (data, socket) {
         if (type === 'array') variable = [];
 
         Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
+        if (group) 
+          Object.defineProperty(variable, 'syc-group', {value: group, enumerable: false});
 
         for (var property in properties) {
-          variable[property] = Simulate_Changes(properties[property], simulated_objects);
+          variable[property] = Simulate_Changes(properties[property], group, simulated_objects);
         }
  
         var map = Map_Object(variable);
@@ -566,13 +651,13 @@ function Receive_Change (data, socket) {
 
 
 // ---- ---- ---- ----  Object Conversion  ----- ---- ---- ---- 
-function Meta (variable, one_way, foreign_id) {
+function Meta (variable, group, foreign_id) {
   var id = foreign_id || token();
 
   Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
 
-  if (one_way)
-    Object.defineProperty(variable, 'syc-one-way', {value: true, enumerable: false});
+  if (group)
+    Object.defineProperty(variable, 'syc-group', {value: group, enumerable: false});
   
   Syc.objects[id] = variable;
  
@@ -592,10 +677,44 @@ function Type (obj) {
   return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
 }
 
+function Locked (id, property, unlock) { 
+  if (observable) {
+    if (id in observe_lock) { 
+      var lock = observe_lock[id];
+
+      if (property in lock && lock[property] > 0) { 
+        if (unlock) { 
+          lock[property] -= 1;
+        }
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function Lock (id, property) { 
+  if (observable) {
+    var locks = observe_lock;
+    if (!(id in locks)) {
+      locks[id] = {}
+    }
+
+    var lock = locks[id];
+    if (property in lock) {
+      lock[property] += 1;
+    } else { 
+      lock[property] = 1;
+    }
+  }
+}
+
+
 function Evaluate (type, value) { 
   if (type === 'string')   return value;
   if (type === 'number')   return Number(value);
-  if (type === 'boolean')  return value === 'true';
+  if (type === 'boolean')  return value === true;
   if (type === 'date')     return JSON.parse(value);
   if (type === 'regexp')   return new RegExp(value);
 
@@ -614,65 +733,19 @@ function Recurrable (type) {
 
 
 // ---- ---- ---- ----  Requests  ---- ---- ---- ----
-
 function Welcome (socket) {
   for (var name in Syc.variables) {
     var id = Syc.variables[name],
-        variable = Syc.objects[id];
+        variable = Syc.objects[id],
+        group = variable['syc-group'];
 
-    Emit('syc-variable-new', {name: name, value: id, description: Describe_Recursive(variable)}, [socket]);
+    if (Read_Permissions(group, socket))
+      Emit('syc-variable-new', {name: name, value: id, description: Describe_Recursive(variable, group)}, socket);
   }
 
-  Emit('syc-welcome', {}, [socket]);
+  Emit('syc-welcome', {}, socket);
 }
 
-/*
-function Reset (socket, data) { 
-  var described = {},
-      sid = socket.id,
-      local_hash = Generate_Hash(),
-      foreign_hash;
-
-  // DDOS prevention
-  if (data) {
-    if (!(sid in reset_counter)) 
-      reset_counter[sid] = 0
-
-    reset_counter[sid] += 1;
-          
-    if (reset_counter[sid] > Syc.reset_limit) {
-      console.warn('Syc: integrity check failed ' + reset_counter[sid] + ' times with client ' + sid + '. Giving up on hard resetting client.');
-      reset_counter[sid] + 5 // Wait 5 integrity check cycles before allowing a reset.
-      return;
-    }
-  }
-
-  // Resetting
-  if (data) foreign_hash = data.hash;
-  else foreign_hash = local_hash; 
-
-  // Resetting requires a full handshake so the client agrees which hash to synchronize.
-  if (foreign_hash === local_hash) { 
-    if (data) { console.log('Client out of sync, resetting client... Socket sid: ' + sid + ' Provided hash: ' + foreign_hash + ', local hash: ' + local_hash); }
-    else { console.log('Synchronizing client sid: ' + sid + '.'); }
-
-    Emit('syc-reset-command', {}, [socket]);
-
-    for (var name in Syc.variables) {
-      var id = Syc.variables[name],
-          variable = Syc.objects[id];
-
-      Emit('syc-variable-new', {name: name, value: id, description: Describe_Recursive(variable)}, [socket]);
-    }
-
-    Emit('syc-welcome', {}, [socket]);
-
-  } else {
-    Emit('syc-integrity-check', {hash: local_hash}, [socket]);
-  }
-  
-}
-*/
 
 // ---- ---- ---- ----  Watchers  ---- ---- ---- ----
 function Watch (object, func, preferences) {
@@ -984,22 +1057,6 @@ function Traverse () {
       delete object_map[id];
     }
   }
-
-  // Integrity check
-  /* Commenting out cuz integrity checking is half-assed
-  for (var sid in reset_counter) {
-    if (reset_counter[sid] > 0) reset_counter[sid] -= 1;
-    else delete reset_counter[sid];
-  }
-
-  hash_timer += Syc.polyfill_interval;
-  if (hash_timer >= Syc.integrity_interval) {
-    hash_timer -= Syc.integrity_interval;
-    var hash = Generate_Hash();
-
-    Broadcast('syc-integrity-check', {hash: hash});
-  }
-  */
 }
 
 function Map (variable, name, path) {

@@ -1,23 +1,18 @@
 "use strict";
 
 var Syc = {
-  Connect: function (socket, callback) {
-    // Sanitize
-    if (callback && Syc.Type(callback) !== 'function') throw "Syc error: Syc.connect() takes a socket and a callback function";
-
+  Connect: function (socket) {
     // connect
-
     Syc.Socket = socket;
 
     socket.on('syc-message-parcel', Syc.Receive_Message);
+
     if ( !(Object.observe) && !(Syc.mapping_timer) )
       Syc.mapping_timer = setInterval(Syc.Traverse, Syc.polyfill_interval);
-
-    Syc.handshake_callback = callback;
   },
 
-  connect:           function (socket, callback) { return Syc.Connect(socket, callback) },
-  list:              function (name, callback) { return Syc.List(name, callback) },
+  connect:           function (socket) { return Syc.Connect(socket) },
+  list:              function (name) { return Syc.List(name) },
   ancestors:         function (object) { return Syc.Ancestors(object) },
   exists:            function (object) { return Syc.Exists(object) },
   watch:             function (o, f, p) { return Syc.Watch(o, f, p) },
@@ -29,36 +24,30 @@ var Syc = {
   Socket: undefined,
   variables: {},
   objects: {},
-  callbacks: {},
 
   polyfill_interval: 260,
 
   watchers: {},
 
+  buffers: [],
+  buffer_delay: 20, 
+  send_timer: false,
+
   observe_lock: {},
   object_map: {},
-
-  handshake_callback: undefined,
 
   observable: !!Object.observe,
 
 
-  /* ---- ---- ---- ----  Setting up  ---- ---- ---- ----  */
+  // ---- ---- ---- ----  Setting up  ---- ---- ---- ----  //
   Handshake: function () {
-    if (Syc.handshake_callback) {
-      try { Syc.handshake_callback() }
-      catch (e) { console.error("Syc connection callback error", e) }
-    }
-
     Syc.Traverse();
-
-    Syc.handshake_callback = undefined; 
   },
 
-  /* ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- */
+  // ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- //
   Receive_Message: function (messages) { 
+    console.log(messages);
     messages.forEach( function (message) { 
-      console.log(message);
 
       var title = message[0],
           data = message[1];
@@ -85,14 +74,6 @@ var Syc = {
     Syc.variables[name] = id;
 
     var variable = Syc.Resolve(description);
-
-    var callbacks = Syc.callbacks[name];
-    if (callbacks) {
-      while (callbacks.length > 0) { 
-        var callback = callbacks.pop();
-        callback(variable);
-      }
-    }
   },
 
   Receive_Change: function (data) { 
@@ -106,7 +87,8 @@ var Syc = {
     if (variable === undefined)
       console.error("Syc error: Out of sync error: received changes to an unknown object: " + id);
 
-    if (Syc.observable) Syc.observe_lock[id] = true;
+    // Make sure Object.observe doesn't capture these remote changes
+    Syc.Lock(id, property);
 
     var oldValue = variable[property];
 
@@ -114,7 +96,10 @@ var Syc = {
       // Make the change
       variable[property] = Syc.Resolve(changes)
     } else if (type === 'delete') { 
-      delete variable[property];
+      if (variable[property] !== undefined)
+        delete variable[property];
+      else
+        Syc.Locked(id, property, true);
     } else { 
       console.error('Syc error: Received changes for an unknown change type: ' + type);
     }
@@ -130,12 +115,11 @@ var Syc = {
         properties,
         value,
         id, 
-        one_way;
+        read;
 
     if (type === 'object' || type === 'array') { 
       properties = changes.properties,
-      id         = changes.value,
-      one_way    = changes.one_way;
+      id         = changes.value;
 
       if (id in Syc.objects) { 
         return Syc.objects[id];
@@ -147,7 +131,7 @@ var Syc = {
           variable[property] = Syc.Resolve(properties[property])
         }
 
-        id = Syc.Meta(variable, one_way, id);
+        id = Syc.Meta(variable, read, id);
 
         Syc.Map_Object(variable);
 
@@ -162,7 +146,7 @@ var Syc = {
   Evaluate: function (type, value) { 
     if (type === 'string')   return value;
     if (type === 'number')   return Number(value);
-    if (type === 'boolean')  return value === 'true';
+    if (type === 'boolean')  return value === true;
     if (type === 'date')     return JSON.parse(value);
     if (type === 'regexp')   return new RegExp(value);
 
@@ -177,6 +161,8 @@ var Syc = {
 
   // ---- ---- ---- ----  Observing & Tracking Changes  ---- ---- ---- ----
   Observed: function (changes) { 
+    var watcher_queue = []; 
+
     for (var change in changes) { 
       var object = changes[change].object,
           property = changes[change].name,
@@ -185,30 +171,43 @@ var Syc = {
           id = object['syc-object-id'],
           oldValue = changes[change].oldValue;
 
-      // Object.observe will also trigger on changing array length. Ignore this.
+      // Object.observe will also trigger on changing array length. Ignore this case.
       if (Syc.Type(object) === 'array' && property === 'length') continue;
 
       // Do not trigger when receiving changes from elsewhere.
-      if (Syc.observable && id in Syc.observe_lock) { delete Syc.observe_lock[id]; return }
+      if (Syc.Locked(id, property, true)) { 
+        console.log('-x-x-x-x- locked: ', object, property, changed, oldValue, type, change); 
+        continue;
+      }
+      console.log('~o~o~o~o~ changed: ', object, property, changed, oldValue, type, change);
 
-      if (object['syc-one-way'] === true) { 
-        if (oldValue) { object[property] = oldValue } 
-        else { delete object[property] }
-        console.error("Syc error: Cannot make changes to a one-way variable.");
-        return;
+      if (object['syc-read-only'] === true) { 
+        if (oldValue) 
+          object[property] = oldValue ;
+        else 
+          delete object[property];
+
+        console.error("Syc error: Cannot make changes to a read-only variable.");
+        continue;
       }
 
       var description = Syc.Describe(changed, object, property);
 
       Syc.Map_Property(object, property);
 
-      Syc.Socket.emit('syc-object-change', { value: id, type: type,  property: property, changes: description });
-      Syc.Awake_Watchers(true, object, property, type, oldValue);
+      Syc.Buffer('syc-object-change', { value: id, type: type,  property: property, changes: description });
+
+      watcher_queue.push([object, property, type, oldValue]);
+    }
+
+    for (var i in watcher_queue) { 
+      var x = watcher_queue[i];
+      Syc.Awake_Watchers(true, x[0], x[1], x[2], x[3]);
     }
   },
 
 
-  Describe: function (variable, parent, path) { 
+  Describe: function (variable) { 
     var type = Syc.Type(variable),
         value = Syc.Evaluate(type, variable);
 
@@ -225,29 +224,23 @@ var Syc = {
 
         Syc.Map_Object(variable);
 
-        return {type: type, value: value, one_way: false, properties: properties};
-      } else { 
-        var one_way = variable['syc-one-way'];
-        if (one_way === true) { 
-          delete parent[path];
-          console.error("Syc error: Cannot make a two-way variable reference a one-way variable");
-        } else {
-          return {type: type, value: value, one_way: one_way};
-        }
+        return {type: type, value: value, properties: properties};
+      } else {
+        return {type: type, value: value};
       }
     } else {
       return {type: type, value: value};
     }
   },
 
-  Meta: function (variable, one_way, id) {
+  Meta: function (variable, read, id) {
     var id = id || token();
 
     Syc.objects[id] = variable;
     Object.defineProperty(variable, 'syc-object-id', {value: id, enumerable: false});
     
-    if (one_way) {
-      Object.defineProperty(variable, 'syc-one-way', {value: true, enumerable: false});
+    if (read) {
+      Object.defineProperty(variable, 'syc-read-only', {value: true, enumerable: false});
     }
 
     if (Syc.observable) Object.observe(variable, Syc.Observed);
@@ -267,16 +260,62 @@ var Syc = {
     return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
   },
 
+  Locked: function (id, property, unlock) { 
+    if (Syc.observable) {
+      if (id in Syc.observe_lock) { 
+        var lock = Syc.observe_lock[id];
+
+        if (property in lock && lock[property] > 0) { 
+          if (unlock) { 
+            lock[property] -= 1;
+          }
+          return true;
+        }
+      }
+    }
+
+    return false;
+  },
+
+  Lock: function (id, property) { 
+    if (Syc.observable) {
+      var locks = Syc.observe_lock;
+      if (!(id in locks)) {
+        locks[id] = {}
+      }
+
+      var lock = locks[id];
+      if (property in lock) {
+        lock[property] += 1;
+      } else { 
+        lock[property] = 1;
+      }
+    }
+  },
+
+  Buffer: function (title, data) { 
+    Syc.buffers.push({title: title, data: data});
+
+    if ( !(Syc.send_timer) ) { 
+      Syc.send_timer = setTimeout(
+  
+        function () {
+          socket.emit('syc-message-parcel', Syc.buffers);
+  
+          Syc.buffers.length = 0;
+          Syc.send_timer = false;
+        }, Syc.buffer_delay
+  
+      )
+    }
+  },
+
   // --- --- ------ ----  Helper Functions  ---- ---- ---- ----
-  List: function (name, callback) {
+  List: function (name) {
     // Sanitizing
     if (name) { var type = typeof name;
       if (type !== 'string') 
         throw "Syc error: Syc.list('name') requires a string for its first argument, but you provided " +type+ ".";
-    }
-    if (callback) { 
-      var type = typeof callback;
-      if (type !== "function") throw "Syc error: The second argument you provided for Syc.list(string, callback) is " +type+ " but needs to be a function."
     }
 
     // listing
@@ -289,13 +328,6 @@ var Syc = {
       return all;
     } else {
       var obj = Syc.objects[Syc.variables[name]];
-      if (obj === undefined) {
-        if (!Syc.callbacks[name]) Syc.callbacks[name] = [];
-        Syc.callbacks[name].push(callback);
-      } else if (callback) { 
-        callback(obj);
-      }
-
       return obj;
     }
   },
@@ -534,32 +566,6 @@ var Syc = {
 
 
   // ---- ---- ---- ----  Integrity Check  ---- ---- ---- ---- 
-/* Discontinued because I think I can do better
-  Integrity_Check: function (data) {
-    Syc.Traverse();
-
-    var foreign_hash = data.hash,
-        local_hash = Syc.Generate_Hash();
-
-    if (foreign_hash !== local_hash) {
-      console.warn('Syc warning: Out of sync. Client resetting. Provided hash: ' + foreign_hash + ', local hash: ' + local_hash);
-
-      Syc.Socket.emit('syc-reset-request', {hash: foreign_hash});
-    }
-  },
-
-  Generate_Hash: function () {
-    var hash = 0;
- 
-    for (var object in Syc.object_map) {
-      var stringified = JSON.stringify(Syc.object_map[object]);
-      hash += Syc.Hash_Code(stringified);
-    }
-
-    return hash;
-  },
-*/
-
   Hash_Code: function (string) {
     var hash = 0, i, chr, len;
     if (string.length == 0) return hash;
@@ -576,9 +582,7 @@ var Syc = {
 
   // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
   // ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 
-  // Map_Object should come after a call to Meta for the variable in question, and
-  // after a recursive describe/resolve (so as to ensure Map_Object's properties all
-  // have syc-object-id).
+  // Map_Object needs an syc-object-id, so call Meta on the object before Mapping it
   Map_Object: function (variable) { 
     var id = variable['syc-object-id'];
 

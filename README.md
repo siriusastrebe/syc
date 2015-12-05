@@ -20,7 +20,7 @@ A side project proof of concept using Syc:
 
 http://treebeard.herokuapp.com/
 
-A simple chat application demonstrating Syc, commented for your pleasure:
+A simple chat application demonstrating Syc
 
 https://github.com/siriusastrebe/Syc-Demo
 
@@ -32,22 +32,17 @@ Documentation
 To sync a variable from the server to the client, create an object or array and pass it through Syc:
 
     // On the server side...
-    var shared = {hello: 'world'}
+    var shared = ['x', 'y', 'z']
     syc.sync('name', shared);
     
 The client can use `syc.list()` to see all existing syc variables.
 
     // On the client side...
     syc.list('name')
-    -> {hello: 'world'}
-    
-No need to wrap your data, Syc will observe the change as it happens automatically (or via polyfills for older clients).
-
-    shared.goodbye = "farewell!"
-
-    // elsewhere...
-    syc.list('name').goodbye
-    -> 'farewell!'
+    -> ['x', 'y', 'z']
+    // or alternately, list all available synchronized variables:
+    syc.list()
+    -> {name: ['x', 'y', 'z']}
 
 ## Setting up Syc
 

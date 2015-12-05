@@ -80,7 +80,7 @@ Syc.connect provides a callback function. A common use case is when listing. You
 ## One-way Variables (Server side)
 
     // Server side
-    var served = [1, 2, 3];
+    var served = {};
     Syc.serve('name', served);
 
 Served variables can't be modified on the client side, providing blanket security over the data.

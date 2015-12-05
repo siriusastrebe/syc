@@ -45,7 +45,7 @@ The client can use `syc.list()` to see all existing syc variables.
     syc.list()
     -> {name: ['w', 'x', 'y']}
     
-Modifying the shared variable is easy, just changed the property and the change will propagate to the server and other clients.
+Modifying the shared variable is easy, just treat it as a regular object or array and changes will propagate to the server and other clients.
 
     syc.list('name').push('z');
     

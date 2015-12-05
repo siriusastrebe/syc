@@ -32,17 +32,23 @@ Documentation
 To sync a variable from the server to the client, create an object or array and pass it through Syc:
 
     // On the server side...
-    var shared = ['x', 'y', 'z']
+    var shared = ['w', 'x', 'y'];
     syc.sync('name', shared);
     
 The client can use `syc.list()` to see all existing syc variables.
 
     // On the client side...
     syc.list('name')
-    -> ['x', 'y', 'z']
+    -> ['w', 'x', 'y']
+    
     // or alternately, list all available synchronized variables:
     syc.list()
-    -> {name: ['x', 'y', 'z']}
+    -> {name: ['w', 'x', 'y']}
+    
+Modifying the shared variable is easy, just changed the property and the change will propagate to the server and other clients.
+
+    syc.list('name').push('z');
+    
 
 ## Setting up Syc
 

@@ -1,14 +1,12 @@
 Syc
 ===
 
-Synchronize data by putting it in an object or an array. Whenever that object or array changes, all your clients receive that change. If a client makes a change, you can verify it before it is synchronized.
-
-The isomorphism and reactivity of Meteor, without the framework. 
+Register an ordinary javascript array or object with Syc, and an identical copy will become available on the client side. Changes by either the server or the client will be automatically synchronized.
 
     var shared = {hello: 'world'}
     syc.sync('name', shared);
 
-Instead of having to wrap your data in function calls for reactivity, Syc will observe the change as it happens automatically (or via polyfills for older clients).
+No need to wrap your getters or setters, Syc will observe the change as it happens automatically (or via a polyfill for older clients).
 
     shared.hello = "Goodbye!!!"
 
@@ -43,7 +41,7 @@ The client can use `syc.list()` to see all existing syc variables.
     syc.list('name')
     -> {hello: 'world'}
     
-You can change the data on either the server or the client. Instead of having to wrap your data in function calls for reactivity, Syc will observe the change as it happens automatically (or via polyfills for older clients).
+No need to wrap your data, Syc will observe the change as it happens automatically (or via polyfills for older clients).
 
     shared.goodbye = "farewell!"
 

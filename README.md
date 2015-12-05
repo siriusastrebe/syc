@@ -167,7 +167,7 @@ When a client makes a change to the object, verifiers will be called *before* th
 
 Verifiers have a property `changes.change` which operates differently from watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. 
 
-**Advanced Tip**: You may modify the `change` property within the verifier. All of the clients will receive the updated value. **Warning** If `changes` references an existing syc variable, those changes will still apply even if the verifier returns false. To protect against this, do:
+**Advanced Tip**: You may modify the `change` property within the verifier. All of the clients will receive the updated value. **Warning** If `changes` references an existing syc variable, those changes will still apply even if the verifier returns false. To protect against this, use Syc.exists():
 
     function check (changes, socket) {
       if Syc.exists(changes.change) {

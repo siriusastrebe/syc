@@ -46,11 +46,11 @@ var Syc = {
 
   // ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- //
   Receive_Message: function (messages) { 
-    console.log(messages);
     messages.forEach( function (message) { 
-
       var title = message[0],
           data = message[1];
+
+      console.log('Received: ', title, data);
 
       if (title === 'syc-object-change') {
         Syc.Receive_Change(data);
@@ -87,26 +87,26 @@ var Syc = {
     if (variable === undefined)
       console.error("Syc error: Out of sync error: received changes to an unknown object: " + id);
 
+    if (type !== 'add' && type !== 'update' && type !== 'delete') 
+      console.error('Syc error: Received changes for an unknown change type: ' + type);
+
     // Make sure Object.observe doesn't capture these remote changes
-    Syc.Lock(id, property);
+    Syc.Lock(id, property, changes);
 
     var oldValue = variable[property];
 
     if (type === 'add' || type === 'update') { 
       // Make the change
       variable[property] = Syc.Resolve(changes)
-    } else if (type === 'delete') { 
-      if (variable[property] !== undefined)
+    } else if (type === 'delete' && variable.hasOwnProperty(property)) {
         delete variable[property];
-      else
-        Syc.Locked(id, property, true);
     } else { 
-      console.error('Syc error: Received changes for an unknown change type: ' + type);
+      console.warn('Syc error: Received changes for an unknown change type: ' + type);
     }
 
     Syc.Map_Object(variable);
 
-    Syc.Awake_Watchers(false, variable, property, type, oldValue);
+    setTimeout(function () {Syc.Awake_Watchers(false, variable, property, type, oldValue)}, 1);
   },
 
   Resolve: function (changes) { 
@@ -175,15 +175,15 @@ var Syc = {
       if (Syc.Type(object) === 'array' && property === 'length') continue;
 
       // Do not trigger when receiving changes from elsewhere.
-      if (Syc.Locked(id, property, true)) { 
-        console.log('-x-x-x-x- locked: ', object, property, changed, oldValue, type, change); 
+      if (Syc.Unlock(id, object, property)) { 
+        console.log('-x-x-x-x- locked: ', property, changed, oldValue, type, change); 
         continue;
       }
-      console.log('~o~o~o~o~ changed: ', object, property, changed, oldValue, type, change);
+      console.log('~o~o~o~o~ changed: ', property, changed, oldValue, type, change);
 
       if (object['syc-read-only'] === true) { 
         if (oldValue) 
-          object[property] = oldValue ;
+          object[property] = oldValue;
         else 
           delete object[property];
 
@@ -260,36 +260,39 @@ var Syc = {
     return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
   },
 
-  Locked: function (id, property, unlock) { 
+  Unlock: function (id, variable, property) { 
     if (Syc.observable) {
       if (id in Syc.observe_lock) { 
-        var lock = Syc.observe_lock[id];
+        var lock = Syc.observe_lock[id],
+            type = Syc.Type(variable[property]),
+            value = Syc.Evaluate(type, variable[property]),
+            identifier = property + type + value;
 
-        if (property in lock && lock[property] > 0) { 
-          if (unlock) { 
-            lock[property] -= 1;
-          }
+        if (identifier in lock) { 
+          delete lock[identifier];
           return true;
         }
       }
     }
-
-    return false;
   },
 
-  Lock: function (id, property) { 
+  Lock: function (id, property, changes) { 
     if (Syc.observable) {
-      var locks = Syc.observe_lock;
+      var locks = Syc.observe_lock,
+          type = changes.type,
+          value = changes.value,
+          identifier = property + type + value;
+
+      // Note: i'm a little worried identifier being a string could cause issues.
+      // Maybe not, since Evaluate() serializes data. If it ain't broke...
+
       if (!(id in locks)) {
         locks[id] = {}
       }
 
       var lock = locks[id];
-      if (property in lock) {
-        lock[property] += 1;
-      } else { 
-        lock[property] = 1;
-      }
+
+      lock[identifier] = true;
     }
   },
 
@@ -476,15 +479,15 @@ var Syc = {
     function Recursive (change) {
       var old_value = change.oldValue,
           old_type = Syc.Type(old_value),
-          new_value = change.change,
+          new_value = change.newValue,
           new_type = Syc.Type(new_value);
 
       if (old_type === 'array' || old_type === 'object') { 
         var referenced = Syc.Ancestors(root),
             unreferenced = Syc.Ancestors(old_value, referenced);
 
-        for (obj in unreferenced) {
-          Unwatch(unreferenced[obj]);
+        for (var obj in unreferenced) {
+          Syc.Unwatch(unreferenced[obj]);
         }
       }
 
@@ -555,7 +558,7 @@ var Syc = {
     change.property = property;
     change.type = type;
     change.oldValue = oldValue;
-    change.change = change.variable[change.property];
+    change.newValue = change.variable[change.property];
     change.local = local;
     change.remote = !local;
 
@@ -568,7 +571,7 @@ var Syc = {
   // ---- ---- ---- ----  Integrity Check  ---- ---- ---- ---- 
   Hash_Code: function (string) {
     var hash = 0, i, chr, len;
-    if (string.length == 0) return hash;
+    if (string.length === 0) return hash;
 
     for (var i = 0, len = string.length; i < len; i++) {
       chr   = string.charCodeAt(i);
@@ -685,7 +688,7 @@ var Syc = {
         var property_id = property['syc-object-id'];
   
         if (property_id === undefined) {
-          Observer(name, variable, 'update ', map);
+          Observer(name, variable, 'update', map);
           return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
         }
   

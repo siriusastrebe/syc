@@ -1,14 +1,12 @@
 Syc
 ===
 
-Synchronize data by putting it in an object or an array. Whenever that object or array changes, all your clients receive that change. If a client makes a change, you can verify it before it is synchronized.
-
-The isomorphism and reactivity of Meteor, without the framework. 
+Register an ordinary javascript array or object with Syc, and an identical copy will become available on the client side. Changes by either the server or the client will be automatically synchronized.
 
     var shared = {hello: 'world'}
-    syc.sync('name', shared);
+    Syc.sync('name', shared);
 
-Instead of having to wrap your data in function calls for reactivity, Syc will observe the change as it happens automatically (or via polyfills for older clients).
+No need to wrap your getters or setters, Syc will observe the change as it happens automatically (or via a polyfill for older clients).
 
     shared.hello = "Goodbye!!!"
 
@@ -22,7 +20,7 @@ A side project proof of concept using Syc:
 
 http://treebeard.herokuapp.com/
 
-A simple chat application demonstrating Syc, commented for your pleasure:
+A simple chat application demonstrating Syc
 
 https://github.com/siriusastrebe/Syc-Demo
 
@@ -33,23 +31,24 @@ Documentation
 
 To sync a variable from the server to the client, create an object or array and pass it through Syc:
 
-    // On the server side...
-    var shared = {hello: 'world'}
-    syc.sync('name', shared);
+    // Server side...
+    var shared = ['w', 'x', 'y'];
+    Syc.sync('name', shared);
     
-The client can use `syc.list()` to see all existing syc variables.
+The client can use `Syc.list()` to see all existing Syc variables.
 
-    // On the client side...
-    syc.list('name')
-    -> {hello: 'world'}
+    // Client side...
+    Syc.list('name')
+    -> ['w', 'x', 'y']
     
-You can change the data on either the server or the client. Instead of having to wrap your data in function calls for reactivity, Syc will observe the change as it happens automatically (or via polyfills for older clients).
+    // or alternately, list all available synchronized variables:
+    Syc.list()
+    -> {name: ['w', 'x', 'y']}
+    
+Modifying the shared variable is easy, just treat it as a regular object or array and changes will propagate to the server and other clients.
 
-    shared.goodbye = "farewell!"
-
-    // elsewhere...
-    syc.list('name').goodbye
-    -> 'farewell!'
+    Syc.list('name').push('z');
+    
 
 ## Setting up Syc
 
@@ -57,10 +56,10 @@ Syc utilizes socket.io but isn't a wrapper for it. So you'll have to initalize i
 
     // Server side setup
     var io = require('socket.io').listen(80),
-        syc = require('syc');
+        Syc = require('syc');
 
     io.sockets.on('connection', function (socket) {
-      syc.connect(socket);
+      Syc.connect(socket);
     });
 
 And on the client:
@@ -69,93 +68,92 @@ And on the client:
     var socket = io.connect();
     Syc.connect(socket);
     
-### Accessing initial data (Client side)
+Syc.connect provides a callback function. A common use case is when listing. You won't see any data until Syc is connected, so try this instead:
 
     // Client side...
-    Syc.connect(socket);
-    var data = Syc.list('name');
-
-If done in the manner above, most often `data` will come back as undefined, as it takes a moment for Syc to synchronize. There are two methods for dealing with this delay:
-
-    Syc.connect(socket, callback);
-
-This lets you run code as you connect to the server. `callback` is an optional parameter and will be triggered when Syc is entirely synchronized to the data held on the server.
-
-The second method allows you to call a function whenever data becomes availble: 
-
-    function callback (variable_root) { }
-    Syc.list('name', callback);
-
-The callback function will be triggered immediately when data is already associated with Syc.list('name'). Otherwise, it will wait until the client receives data for that variable. Useful when `'name'` will be synced or served at some point in the future.
+    var synchronized_variable;
+    
+    Syc.connect(socket, function () {
+      synchronized_variable = Syc.list('name');
+    });
 
 ## One-way Variables (Server side)
 
     // Server side
-    var served = [1, 2, 3];
-    syc.serve('name', served);
+    var served = {};
+    Syc.serve('name', served);
 
-Serving a variable restricts the client from making any changes to data bound to the served variable. Useful for when you do not want a malicious client to tampering with the data. 
+Served variables can't be modified on the client side, providing blanket security over the data.
 
-*Note*: To avoid confusion, Syc forbids one-way served variables from referencing or being referenced by two-way variables.
+*Note*: Syc forbids served variables from referencing or being referenced by sync'd variables.
 
 ## Watchers (Client and Server Side)
 
 Occasionally, you'll want to be notified when changes are made to your variable.
 
-    syc.watch(object, alertMe)
-    function alertMe (changes, socket) {
+    function log_changes (changes, socket) {
         console.log(changes);
     }
 
-Watchers provide insight into an object whose property has been changed. If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
+    Syc.watch(object, log_changes)
+    
+Watchers trigger whenever a property of the object or array has been changed.
 
 `changes` has the following properties available to it:
 
     changes.variable  // The variable whose property was modified.
     changes.property  // The modified property's name.
     changes.change    // The actual changed value, shorthand for `change.variable[change.property]`
-    changes.oldValue  // What was previously held in `change.variable[change.property]`.
+    changes.oldValue  // The contents of `change.variable[change.property]` before it was modified.
     changes.type      // Any one of `add`, `update` or `delete`.
     changes.local     // True if the change originated locally.
     changes.remote    // True if the change was received from elsewhere.
 
-You can also specify preferences: 
-    
-    syc.watch(object, alertMe, {remote: true, local: false})
+If multiple properties are changed simultaneously, the watcher will trigger once for each property. 
 
-If either `remote` or `local` are set to false, the watcher will not trigger on changes from that origin.
+You can also specify preferences for triggering only on changes from one origin. 
+    
+    Syc.watch(object, alertMe, {remote: true, local: false})
 
 ##### Recursive Watching
 
-    syc.watch_recursive(object, alertMe)
+    Syc.watch_recursive(object, log_changes)
 
-Recursively watching a will apply a watcher on that variable and all of its descendant object/arrays. Any new descendant object will also be given the watcher, and descendants removed from the object will automatically be unwatched. You can also provide preferences like on regular watchers:
+or
 
-    syc.watch_recursive(object, alertMe, {remote: false})
+    Syc.watch_recursive(object, log_changes, {remote: false})
+
+Recursively watching a will apply a watcher on that variable and all of its descendant object/arrays. New descendant objects will also be watched, and descendants removed from the object will automatically be unwatched.
+
 
 ### Unwatching
 
-    syc.unwatch(object, [function]);
+    Syc.unwatch(object);
 
-Unwatching removes all watchers from that object. The `function` is optional, and will selectively unwatch only that function from the object.
+or
+
+    Syc.unwatch(object, log_changes);
+
+Unwatching removes all watchers from that object. If `function` is provided, only that function
 
 ##### Recursive Unwatching
 
-    syc.unwatch_recursive(object, [function]);
+    Syc.unwatch_recursive(object, [function]);
 
 ## Verifiers (Server side)
 
 While watchers are good for alerting changes after they happen, often you'll want to verify that a client's change is harmless before it takes effect. Verifiers look similar to watchers, but will accept a change only if the function returns true.
 
-    Syc.verify(object, check)
     function check (changes, socket) {
       // Reject the change and revert if it is not a 'string' type.
       return (typeof changes.change !== 'string'); 
     }
     
-By its nature, verifiers are avaiable only on the server side, and will trigger only on changes from the client.
+    Syc.verify(object, check)
+    
+By its nature, verifiers are avaiable only on the server side, and will trigger only on changes from clients.
 
-When a client makes a change to the object, verifiers will be called *before* the change happens. For multiple verifiers, all must return true to accept the change. If accepted the change is applied, then watchers will be called. If any return false, the verifier drops the change, watchers will not be called, and the offending client is re-synced.
+When a client makes a change to the object, verifiers will be called *before* the change happens. If the verifier's function returns true, the change is accepted and then watchers are called. If the verifier returns false the change is rejected, watchers will not be called, and the offending client is re-synced.
 
 `changes` has the following properties available to it:
 
@@ -167,10 +165,18 @@ When a client makes a change to the object, verifiers will be called *before* th
     changes.local     // True if the change originated locally.
     changes.remote    // True if the change was received from elsewhere.
 
-
 Verifiers have a property `changes.change` which operates differently from watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. 
 
-**Advanced Tip**: You can modify `change` and the final result will reflect these modifications. The originating client and all other clients will receive the modified result. <sub>**Warning**: Careful when doing so, </sub> if the change references another registered Syc object or array, any changes you make will apply *even if* the verifier returns **false**. To check for this case, use `Syc.exists(object)`.
+**Advanced Tip**: You may modify the `change` property within the verifier. All of the clients will receive the updated value. **Warning** If `changes` references an existing syc variable, those changes will still apply even if the verifier returns false. To protect against this, use Syc.exists():
+
+    function check (changes, socket) {
+      if Syc.exists(changes.change) {
+        return false;
+      } else {
+        changes.change = 'banana';
+        return true;
+      }
+    }
 
 ##### Recursive Verification
 
@@ -180,13 +186,13 @@ Recursively verifying a will apply a verifier on that variable and all of its de
 
 ### Unverify
 
-    syc.unverify(object, [function])
+    Syc.unverify(object, [function])
 
 Unwatching removes all watchers from that object. `function` is optional, and will selectively unwatch only that function from the object.
 
-##### Recursive Unwatching
+##### Recursive Unverification
 
-    syc.unwatch_recursive(object, [function]);
+    Syc.unverify_recursive(object, [function]);
 
 ## Helper Functions (Server Side)
 
@@ -200,8 +206,6 @@ Unwatching removes all watchers from that object. `function` is optional, and wi
     // The built in type system Syc uses. Can differentiate between 'object' and 'array'.
 
 - - - 
-This library is a work in progress.
+This library is a work in progress. Version 2.0 will be released by the end of 2015.
 
-Planned features: Groups (Still in planning): This feature would provide security and selective data sharing for clients, Custom datastructures (Still in planning): This feature would allow you to specify conversion of arbitrary data structures to JSON and back, allowing synchronization from server to client.
-
-Syc currently supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind. Try it!
+Syc supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind.

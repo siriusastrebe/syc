@@ -1,3 +1,6 @@
+// # https://github.com/siriusastrebe/syc
+// # MIT License
+
 var connected = [];
 var observe_lock = {};
 var observe_redirect = {};

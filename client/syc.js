@@ -1,3 +1,6 @@
+// # https://github.com/siriusastrebe/syc
+// # MIT License
+
 "use strict";
 
 var Syc = {

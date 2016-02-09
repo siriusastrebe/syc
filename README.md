@@ -206,6 +206,6 @@ Unwatching removes all watchers from that object. `function` is optional, and wi
     // The built in type system Syc uses. Can differentiate between 'object' and 'array'.
 
 - - - 
-This library is a work in progress. Version 2.0 will be released by the end of 2015.
+This library is a work in progress. Version 2.0 will be released by the end of 2016.
 
 Syc supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind.

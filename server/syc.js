@@ -41,18 +41,18 @@ Syc = {
       throw "Syc error: Syc.serve(name, variable) can't serve a primitive value, and takes an object or array as the second parameter. "  
 
     Create_Group(variable, name, {readonly: true, global: true});
-    New_Variable(name, variable, {readonly: true, group: name});
+    New_Variable(name, variable, name);
     return variable; 
   },
 
-  groupsync: function (name, varialbe, sockets) { 
+  groupsync: function (name, variable, sockets) { 
     if (Type(name) !== 'string') throw "Syc error: Syc.groupsync(name, variable, [sockets]) requires a string as the first argument."
     if (variable === undefined) var variable = {};
     if (Type(variable) !== 'object' && Type(variable) !== 'array')
       throw "Syc error: Syc.groupsync(name, variable, [sockets]) can't synchronize a primitive value, and takes an object or array as the second parameter. "  
 
     Create_Group(variable, name, {sockets: sockets});
-    New_Variable(name, variable, {readonly: false, group: name});
+    New_Variable(name, variable, name);
   },
 
   groupserve: function (name, variable, sockets) { 
@@ -61,8 +61,8 @@ Syc = {
     if (Type(variable) !== 'object' && Type(variable) !== 'array')
       throw "Syc error: Syc.groupserve(name, variable, [sockets]) can't serve a primitive value, and takes an object or array as the second parameter. "  
 
-    Create_Group(variable, name, {sockets: sockets});
-    New_Variable(name, variable, {readonly: true, group: name});
+    Create_Group(variable, name, {readonly: true, sockets: sockets});
+    New_Variable(name, variable, name);
   },
 
 
@@ -369,16 +369,7 @@ function Describe_Recursive (variable, group, visited) {
 }
 
 
-function New_Variable (name, variable, preferences) { 
-  var readonly = false,
-      group,
-      sockets;
-
-  if (preferences) {
-    readonly = preferences.readonly;
-    group = preferences.group;
-  }
-
+function New_Variable (name, variable, group) { 
   if (name in Syc.variables) throw "There is already a syc variable by the name " +name+ ".";
 
   if (!variable['syc-object-id']){ 

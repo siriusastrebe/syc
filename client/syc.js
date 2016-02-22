@@ -15,6 +15,7 @@ var Syc = {
   },
 
   connect:           function (socket) { return Syc.Connect(socket) },
+	loaded:            function (callback) { return Syc.Loaded(callback) },
   list:              function (name) { return Syc.List(name) },
   ancestors:         function (object) { return Syc.Ancestors(object) },
   exists:            function (object) { return Syc.Exists(object) },
@@ -41,10 +42,31 @@ var Syc = {
 
   observable: !!Object.observe,
 
+  handshaken: false,
+  loaded_callbacks: [],
 
   // ---- ---- ---- ----  Setting up  ---- ---- ---- ----  //
   Handshake: function () {
+    Syc.handshaken = true;
     Syc.Traverse();
+    Syc.Loaded();
+  },
+
+  Loaded: function (callback) { 
+    if (callback && Syc.type(callback) !== 'function') 
+      throw "Syc error: Syc.loaded(callback) optionally requires a function for its argument."
+
+    if (callback) { 
+      Syc.loaded_callbacks.push(callback);
+    }
+    if (Syc.handshaken) {
+      for (var c in Syc.loaded_callbacks) { 
+        Syc.loaded_callbacks[c]();
+      }
+      Syc.loaded_callbacks.length = 0;
+    }
+
+    return Syc.handshaken;
   },
 
   // ---- ---- ---- ----  Receiving Objects  ---- ---- ---- ---- //
@@ -101,7 +123,8 @@ var Syc = {
     if (type === 'add' || type === 'update') { 
       // Make the change
       variable[property] = Syc.Resolve(changes)
-    } else if (type === 'delete' && variable.hasOwnProperty(property)) {
+    } else if (type === 'delete') {
+      if (variable.hasOwnProperty(property))
         delete variable[property];
     } else { 
       console.warn('Syc error: Received changes for an unknown change type: ' + type);

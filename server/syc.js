@@ -428,8 +428,11 @@ function Receive_Change (data, socket) {
       changes  = data.changes;
       variable = Syc.objects[id];
   
-  if (variable === undefined)
+  if (variable === undefined) { 
     console.warn("Received changes to an unknown object: " + id + ".");
+		return;
+  }
+
   var group    = variable['syc-group'];
 
   // Permission checking

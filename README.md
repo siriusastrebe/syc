@@ -68,12 +68,12 @@ And on the client:
     var socket = io.connect();
     Syc.connect(socket);
     
-Syc.connect provides a callback function. A common use case is when listing. You won't see any data until Syc is connected, so try this instead:
+Syc.list() will only work once Syc is connected. Syc.loaded will tell if you Syc is connected, and will take a callback function that is run when syc is properly synchronized (or immediately if already synchronized):
 
     // Client side...
     var synchronized_variable;
     
-    Syc.connect(socket, function () {
+    Syc.loaded(function () {
       synchronized_variable = Syc.list('name');
     });
 

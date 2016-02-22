@@ -198,12 +198,12 @@ Unwatching removes all watchers from that object. `function` is optional, and wi
 
 Sometimes you will want to keep data hidden only from certain clients. Syc.groupsync and Syc.groupserve will allow only clients whose sockets have been added to the security group to access the variables.
 
-    Syc.groupsync('restricted')
+    Syc.groupsync('restricted', {data: 'zero'})
     Syc.add('restricted', socket)
 
 For restricting a readonly:
 
-    Syc.groupserve('restricted')
+    Syc.groupserve('restricted', {data: 'one'})
     Syc.add('restricted', socket)
 
 ## Helper Functions (Server Side)

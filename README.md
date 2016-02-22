@@ -68,12 +68,12 @@ And on the client:
     var socket = io.connect();
     Syc.connect(socket);
     
-Syc.connect provides a callback function. A common use case is when listing. You won't see any data until Syc is connected, so try this instead:
+Syc.list() will only work once Syc is connected. Syc.loaded will tell if you Syc is connected, and will take a callback function that is run when syc is properly synchronized (or immediately if already synchronized):
 
     // Client side...
     var synchronized_variable;
     
-    Syc.connect(socket, function () {
+    Syc.loaded(function () {
       synchronized_variable = Syc.list('name');
     });
 
@@ -103,7 +103,7 @@ Watchers trigger whenever a property of the object or array has been changed.
 
     changes.variable  // The variable whose property was modified.
     changes.property  // The modified property's name.
-    changes.change    // The actual changed value, shorthand for `change.variable[change.property]`
+    changes.newValue  // The actual changed value, shorthand for `change.variable[change.property]`
     changes.oldValue  // The contents of `change.variable[change.property]` before it was modified.
     changes.type      // Any one of `add`, `update` or `delete`.
     changes.local     // True if the change originated locally.
@@ -159,7 +159,7 @@ When a client makes a change to the object, verifiers will be called *before* th
 
     changes.variable  // The variable whose property was modified.
     changes.property  // The modified property's name.
-    changes.change    // A simulation of the proposed change. Can be modified within the verifier.
+    changes.newValue  // A simulation of the proposed change. Can be modified within the verifier.
     changes.oldValue  // What was previously held in `change.variable[change.property]`.
     changes.type      // Any one of `add`, `update` or `delete`.
     changes.local     // True if the change originated locally.
@@ -193,6 +193,18 @@ Unwatching removes all watchers from that object. `function` is optional, and wi
 ##### Recursive Unverification
 
     Syc.unverify_recursive(object, [function]);
+    
+## Security Groups (Server Side) 
+
+Sometimes you will want to keep data hidden only from certain clients. Syc.groupsync and Syc.groupserve will allow only clients whose sockets have been added to the security group to access the variables.
+
+    Syc.groupsync('restricted', {data: 'zero'})
+    Syc.add('restricted', socket)
+
+For restricting a readonly:
+
+    Syc.groupserve('restricted', {data: 'one'})
+    Syc.add('restricted', socket)
 
 ## Helper Functions (Server Side)
 
@@ -206,6 +218,5 @@ Unwatching removes all watchers from that object. `function` is optional, and wi
     // The built in type system Syc uses. Can differentiate between 'object' and 'array'.
 
 - - - 
-This library is a work in progress. Version 2.0 will be released by the end of 2016.
 
 Syc supports nested arrays/objects any number of levels deep, and circular data structures. Built with efficiency and minimum network utilization in mind.

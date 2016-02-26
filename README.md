@@ -146,7 +146,7 @@ While watchers are good for alerting changes after they happen, often you'll wan
 
     function check (changes, socket) {
       // Reject the change and revert if it is not a 'string' type.
-      return (typeof changes.change !== 'string'); 
+      return (typeof changes.newValue !== 'string'); 
     }
     
     Syc.verify(object, check)
@@ -159,24 +159,11 @@ When a client makes a change to the object, verifiers will be called *before* th
 
     changes.variable  // The variable whose property was modified.
     changes.property  // The modified property's name.
-    changes.newValue  // A simulation of the proposed change. Can be modified within the verifier.
+    changes.newValue  // A simulation of the proposed change.
     changes.oldValue  // What was previously held in `change.variable[change.property]`.
     changes.type      // Any one of `add`, `update` or `delete`.
     changes.local     // True if the change originated locally.
     changes.remote    // True if the change was received from elsewhere.
-
-Verifiers have a property `changes.change` which operates differently from watchers. It is a simulation of what will be placed within `variable[property]` if the change is accepted. 
-
-**Advanced Tip**: You may modify the `change` property within the verifier. All of the clients will receive the updated value. **Warning** If `changes` references an existing syc variable, those changes will still apply even if the verifier returns false. To protect against this, use Syc.exists():
-
-    function check (changes, socket) {
-      if Syc.exists(changes.change) {
-        return false;
-      } else {
-        changes.change = 'banana';
-        return true;
-      }
-    }
 
 ##### Recursive Verification
 

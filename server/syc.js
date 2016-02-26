@@ -610,7 +610,7 @@ function Unlock (id, val, property) {
 
 function Lock (id, property, val) { 
   if (observable) {
-      var locks = Syc.observe_lock,
+      var locks = observe_lock,
           type = Type(val),
           value = Evaluate(type, val);
           identifier = property + type + value;

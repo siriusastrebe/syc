@@ -3,7 +3,6 @@
 
 var connected = [];
 var observe_lock = {};
-var observe_redirect = {};
 var object_map = {};
 var observable = !!Object.observe;
 
@@ -156,30 +155,19 @@ function Ancestors (variable, visited, objects) {
   if (Syc.Type(visited) === 'array')
     visited = Array_To_Dictionary(visited);
 
-  if (visited[id]) 
-    return;
-  else
-    visited[id] = true;
+  if (visited[id]) return;
+  else visited[id] = true;
 
   objects.push(variable);
 
   for (var property in variable) {
     var type = Type(variable[property]);
 
-    if (type === 'object' || type === 'array') 
+    if ((type === 'object' || type === 'array') && Exists(variable[property])) 
       Ancestors(variable[property], visited, objects);
   }
 
   return objects;
-
-  function Array_To_Dictionary (objects) {
-    var dick = {};
-    for (var o in objects) {
-      var id = objects[o]['syc-object-id'];
-      dick[id] = objects[o];
-    }
-    return dick;
-  }
 }
 
 function Exists (object) {
@@ -289,12 +277,7 @@ function Observed (changes) {
 
     var data = { value: id, type: type, property: property, changes: description }
 
-    // Observed_Redirect is used to synchronize the originating client of a modified verifier newValue.
-    if (observe_redirect[id]) {
-      Emit('syc-object-change', data, observe_redirect[id]);
-    } else {
-      Broadcast('syc-object-change', data, group);
-    }
+    Broadcast('syc-object-change', data, group);
 
     watcher_queue.push([object, property, type, oldValue]);
   }
@@ -434,8 +417,7 @@ function Receive_Change (data, socket) {
   }
 
   // Create a simulation, so that it can be verified before taking effect
-  var old_description = Describe(variable[property], group),
-      oldValue = variable[property],
+  var oldValue = variable[property],
       simulations = [],
       simulated_root = Simulate_Changes(changes, group, simulations), 
       verifier_options = {newValue: simulated_root};
@@ -447,9 +429,7 @@ function Receive_Change (data, socket) {
     // Apply the change
     Change_Property(type, variable, property, verifier_options.newValue);
 
-    // The sender gets a different variant of the change if newValue was modified in the verifier function
     var description = Describe_Simulation(variable[property], group);
-    Resync_Sender(variable, property, type, old_description, socket, simulations);
 
     // Sync all other clients
     Broadcast('syc-object-change', { value: id, type: type, property: property, changes: description }, group, socket);
@@ -498,7 +478,6 @@ function Receive_Change (data, socket) {
         complementary_type;
 
     if (client.type !== type || client.value !== value) { 
-      console.log(client.type, type, client.value, value);
       if (variable.hasOwnProperty(property)) {
         if (changetype === 'add' || changetype === 'update')
           complementary_type = 'update';
@@ -511,24 +490,6 @@ function Receive_Change (data, socket) {
       var data = {value: id, type: complementary_type, property: property, changes: server}
 
       Emit('syc-object-change', data, socket);
-    }
-  
-    // Once verification occurs, the verifier function is allowed to change newValue. A different
-    // set of changes need to be captured and sent to the client that originated the change. 
-    if (simulated) { 
-      simulated.forEach( function (object) {
-        var id = object['syc-object-id'];
-      
-        observe_redirect[id] = socket;
-        console.log('observe_redirecting');
-      
-        Detect_Deletions(object);
-        for (var property in object) {
-          Detect_Modifications(object, property);
-        }
-
-        delete observe_redirect[id];
-      });
     }
   }
 
@@ -1036,142 +997,79 @@ function Buffer (title, data, audience) {
 function Map_Object (variable) { 
   var id = variable['syc-object-id'];
 
-  object_map[id] = []; // Reset the mapping
+  // Reset the mapping
+  object_map[id] = [];
 
   for (var property in variable) { 
-    var type = Type(variable[property]),
-        value = Evaluate(type, variable[property]);
-
-    object_map[id][property] = {type: type, value: value};
+    Map_Property(variable, property);
   }
-
-  return object_map[id];
 }
 
 function Map_Property (variable, property) {
   var id = variable['syc-object-id'],
       type = Type(variable[property]),
-      value = Evaluate(type, variable[property]);
+      value = Evaluate(type, variable[property]),
+      map = object_map[id]
 
-  object_map[id][property] = {type: type, value: value};
+  if (property in variable) { 
+    map[property] = {type: type, value: value};
+  } else if (map[property]) {
+    delete map[property];
+  }
 }
 
-var visited = {};
-var hash_timer = 0;
 
 function Traverse () { 
-  for (var id in Syc.objects) { 
-    visited[id] = false;
-  }
+  var visited = {};
 
-  // Start the recursion
   for (var name in Syc.variables) { 
-    Map(Syc.objects[Syc.variables[name]], name);
+    var root = Syc.objects[Syc.variables[name]],
+        descendants = Ancestors(root);
+
+    descendants.forEach(function (node) {
+      var id = node['syc-object-id'],
+          map = object_map[id];
+
+      for (var property in map) {
+        if (!(property in node)) {
+          Observer(property, node, 'delete', map[property].value);
+        }
+      }
+
+      for (var property in node) { 
+        if (!(property in map)) { 
+          Observer(property, node, 'add', undefined);
+        } else { 
+          var mapped_type = map[property].type,
+              mapped_value = map[property].value,
+              current_type = Type(node[property]),
+              current_value = Evaluate(current_type, node[property]);
+
+          if (mapped_type !== current_type || mapped_value !== current_value) {
+            Observer(property, node, 'update', map[property].value);
+          }
+        }
+      }
+
+      visited[id] = true;
+    });
   }
 
-  // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
-  for (var id in visited) { 
-    if (!(visited[id])) { 
-      delete Syc.objects[id];
-      delete object_map[id];
-    }
-  }
-}
+  function Observer (property, object, type, oldValue) { 
+    var changes = {name: property, object: object, type: type};
 
-function Map (variable, name, path) {
-  var id = variable['syc-object-id'];
-
-  if (id === undefined) console.error('Syc Sanity Check: polyfill cannot determine object id');
-  if (path === undefined) { var path = [] }
-
-  var proceed = Per_Object(variable, id, name, path);
-
-  if (proceed) {
-    for (var property in variable) {
-      var recur = Detect_Modifications(variable, property, id);
-
-      if (recur) {
-        path.push(property)
-        Map(variable[property], name, path);
-        path.pop();
+    if (oldValue) { 
+      if (oldValue.type === 'array' || oldValue.type === 'object') { 
+        if (oldValue.value in Syc.objects) { 
+          changes.oldValue = Syc.objects[oldValue.value];
+        }
+      } else {
+        changes.oldValue = oldValue;
       }
     }
 
-    Map_Object(variable);
+    Observed([changes]);
   }
-}
-
-function Per_Object (variable, id, name, path) { 
-  if (visited[id])  
-    return false;
-  else 
-    visited[id] = true;
-  
-
-  Detect_Deletions(variable);
-
-  return true;
-}
-
-function Detect_Deletions(variable) {
-  var id = variable['syc-variable-id'],
-      map = object_map[id];
-
-  for (var property in map) {
-    if (!(property in variable)) { 
-      Observer(property, variable, 'delete', map[property]);
-    }
-  }
-}
-
-function Detect_Modifications (variable, name) { 
-  var property = variable[name],
-      id = variable['syc-object-id'],
-      type = Type(property),
-      value = Evaluate(type, property);
-
-  var map = object_map[id][name];
-
-  if (map === undefined) {
-    Observer(name, variable, 'add');
-  }
-
-  else if (map.type !== type) { 
-    Observer(name, variable, 'update', map);
-  }
-
-  else if (type === 'array' || type === 'object') { 
-    if (value === undefined) {
-      Observer(name, variable, 'update ', map);
-
-      return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
-    }
-
-    else if (value !== map.value) { 
-      Observer(name, variable, 'update', map);
-    }
-
-    return true;
-
-  } else if (map.value !== value) { 
-    Observer(name, variable, 'update', map.value);
-  }
- 
-  return false; 
-}
-
-function Observer (name, object, type, oldValue) { 
-  var changes = {name: name, object: object, type: type};
-
-  if (oldValue) { 
-    if (oldValue.type === 'array' || oldValue.type === 'object') { 
-      changes.oldValue = Syc.objects[oldValue.value];
-    } else {
-      changes.oldValue = oldValue;
-    }
-  }
-
-  Observed([changes]);
 }
 
 function Generate_Hash () {

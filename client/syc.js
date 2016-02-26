@@ -132,7 +132,7 @@ var Syc = {
 
     Syc.Map_Object(variable);
 
-    setTimeout(function () {Syc.Awake_Watchers(false, variable, property, type, oldValue)}, 1);
+    setTimeout(function () {Syc.Awake_Watchers(false, variable, property, type, oldValue)}, 0);
   },
 
   Resolve: function (changes) { 
@@ -144,8 +144,8 @@ var Syc = {
         read;
 
     if (type === 'object' || type === 'array') { 
-      properties = changes.properties,
-      id         = changes.value;
+      var properties = changes.properties,
+          id         = changes.value;
 
       if (id in Syc.objects) { 
         return Syc.objects[id];
@@ -157,7 +157,7 @@ var Syc = {
           variable[property] = Syc.Resolve(properties[property])
         }
 
-        id = Syc.Meta(variable, read, id);
+        Syc.Meta(variable, read, id);
 
         Syc.Map_Object(variable);
 
@@ -217,7 +217,7 @@ var Syc = {
         continue;
       }
 
-      var description = Syc.Describe(changed, object, property);
+      var description = Syc.Describe(changed);
 
       Syc.Map_Property(object, property);
 
@@ -243,7 +243,7 @@ var Syc = {
         var properties = {};
 
         for (var property in variable) {
-          properties[property] = Syc.Describe(variable[property], variable, property);
+          properties[property] = Syc.Describe(variable[property]);
         }
 
         value = Syc.Meta(variable);
@@ -329,7 +329,7 @@ var Syc = {
       Syc.send_timer = setTimeout(
   
         function () {
-          socket.emit('syc-message-parcel', Syc.buffers);
+          Syc.Socket.emit('syc-message-parcel', Syc.buffers);
   
           Syc.buffers.length = 0;
           Syc.send_timer = false;
@@ -365,6 +365,8 @@ var Syc = {
     // Sanitize
     var type = typeof variable;
     if (type !== 'object') throw "Syc error: Syc.ancestors() takes an object, you provided " +type+ ".";
+    if (!Syc.exists(variable)) console.trace();
+    if (!Syc.exists(variable)) console.log(variable);
     if (!Syc.exists(variable)) throw "Syc error: Syc.ancestors can only be called on Syc registered objects and arrays.";
 
     // Ancestors
@@ -372,33 +374,19 @@ var Syc = {
         visited = visited || {},
         objects = objects || [];
 
-    if (Syc.Type(visited) === 'array')
-      visited = Array_To_Dictionary(visited);
-
-    if (visited[id]) 
-      return;
-    else
-      visited[id] = true;
+    if (visited[id]) return;
+    else visited[id] = true;
 
     objects.push(variable);
 
     for (var property in variable) {
       var type = Syc.Type(variable[property]);
 
-      if (type === 'object' || type === 'array') 
+      if ((type === 'object' || type === 'array') && Syc.Exists(variable[property])) 
         Syc.Ancestors(variable[property], visited, objects);
     }
 
     return objects;
-
-    function Array_To_Dictionary (objects) {
-      var dick = {};
-      for (var o in objects) {
-        var id = objects[o]['syc-object-id'];
-        dick[id] = objects[o];
-      }
-      return dick;
-    }
   },
 
   Exists: function (object) {
@@ -409,8 +397,8 @@ var Syc = {
     // Exists
     var id = object['syc-object-id'];
     if (!id) return false;   
-    if (Syc.objects[id]) return true;
-    return false;
+    else if (Syc.objects[id]) return true;
+    else return false;
   },
 
   // ---- ---- ---- ----  Watchers  ---- ---- ---- ---- 
@@ -626,113 +614,57 @@ var Syc = {
   Map_Property: function (variable, property) {
     var id = variable['syc-object-id'],
         type = Syc.Type(variable[property]),
-        value = Syc.Evaluate(type, variable[property]);
+        value = Syc.Evaluate(type, variable[property]),
+        map = Syc.object_map[id];
 
-    Syc.object_map[id][property] = {type: type, value: value};
+    if (property in variable) { 
+      map[property] = {type: type, value: value};
+    } else if (map[property]) {
+      delete map[property];
+    }
   },
 
 
-
-  Traverse: function () {
+  Traverse: function () { 
     var visited = {};
- 
-    for (var id in Syc.objects) { 
-      visited[id] = false;
-    }
 
-    // Start the recursion
     for (var name in Syc.variables) { 
-      Map(Syc.objects[Syc.variables[name]], name);
-    }
+      var root = Syc.objects[Syc.variables[name]],
+          descendants = Syc.Ancestors(root);
 
-    // Mark Sweep algorithm for garbage collection (if unvisited, garbage collect)
-    for (var id in visited) { 
-      if (!(visited[id])) { 
-        delete Syc.objects[id];
-        delete Syc.object_map[id];
-      }
-    }
+      descendants.forEach(function (node) {
+        var id = node['syc-object-id'],
+            map = Syc.object_map[id];
 
-    function Map (variable) {
-      var id = variable['syc-object-id'];
+        if (id === undefined) console.log('somthin weird');
 
-      if (id === undefined) throw 'Sanity Check: polyfill cannot determine object id';
-      if (path === undefined) { var path = [] }
-  
-      var proceed = Per_Object(variable);
-
-      if (proceed) { 
-        for (var property in variable) {
-          var recur = Per_Property(variable, property);
-  
-          if (recur) { 
-            Map(variable[property], name, path);
+        for (var property in map) {
+          if (!(property in node)) {
+            Observer(property, node, 'delete', map[property].value);
           }
         }
 
-        Syc.Map_Object(variable);
-      }
-    }
+        for (var property in node) { 
+          if (!(property in map)) { 
+            Observer(property, node, 'add', undefined);
+          } else { 
+            var mapped_type = map[property].type,
+                mapped_value = map[property].value,
+                current_type = Syc.Type(node[property]),
+                current_value = Syc.Evaluate(current_type, node[property]);
+  
+            if (mapped_type !== current_type || mapped_value !== current_value) {
+              Observer(property, node, 'update', map[property].value);
+            }
+          }
+        }
 
-    function Per_Object (variable) { 
-      var id = variable['syc-object-id'];
-
-      if (visited[id])
-        return false;
-      else 
         visited[id] = true;
-      
-
-      var map = Syc.object_map[id];
-  
-      for (var property in map) {
-        if (!(property in variable)) { 
-          Observer(property, variable, 'delete', map[property]);
-        }
-      }
-
-      return true;
+      });
     }
 
-    function Per_Property (variable, name) { 
-      var property = variable[name],
-          type = Syc.Type(property),
-          value = Syc.Evaluate(type, property),
-          id = variable['syc-object-id'];
-  
-      var map = Syc.object_map[id][name];
-  
-      if (map === undefined) {
-        Observer(name, variable, 'add');
-      }
-  
-      else if (map.type !== type) { 
-        Observer(name, variable, 'update', map);
-      }
-  
-      else if (type === 'array' || type === 'object') { 
-        var property_id = property['syc-object-id'];
-  
-        if (property_id === undefined) {
-          Observer(name, variable, 'update', map);
-          return false; // Map doesn't need to recur over untracked objects/arrays (Those are handled by Observed)
-        }
-  
-        else if (map.value !== property_id) { 
-          Observer(name, variable, 'update', map);
-        }
-  
-        return true;
-  
-      } else if (map.value !== value) { 
-        Observer(name, variable, 'update', map.value);
-      }
-   
-      return false; 
-    }
-  
-    function Observer (name, object, type, oldValue) { 
-      var changes = {name: name, object: object, type: type};
+    function Observer (property, object, type, oldValue) { 
+      var changes = {name: property, object: object, type: type};
 
       if (oldValue) { 
         if (oldValue.type === 'array' || oldValue.type === 'object') { 

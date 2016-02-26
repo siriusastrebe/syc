@@ -152,7 +152,7 @@ function Ancestors (variable, visited, objects) {
       visited = visited || {},
       objects = objects || [];
 
-  if (Syc.Type(visited) === 'array')
+  if (Type(visited) === 'array')
     visited = Array_To_Dictionary(visited);
 
   if (visited[id]) return;
@@ -596,8 +596,8 @@ function Unlock (id, val, property) {
   if (observable) {
     if (id in observe_lock) { 
       var lock = observe_lock[id],
-          type = Syc.Type(val),
-          value = Syc.Evaluate(type, val),
+          type = Type(val),
+          value = Evaluate(type, val),
           identifier = property + type + value;
 
       if (identifier in lock) { 
@@ -661,14 +661,14 @@ function Verify (object, func, preferences) {
 }
 
 function Watch_Recursive (object, func, preferences) {
-  if (Syc.Type(preferences) !== 'object') preferences = {};
+  if (Type(preferences) !== 'object') preferences = {};
   preferences.recursive = true;
 
   Watch(target, func, preferences);
 }
 
 function Verify_Recursive (object, func, preferences) {
-  if (Syc.Type(preferences) !== 'object') preferences = {};
+  if (Type(preferences) !== 'object') preferences = {};
   preferences.recursive = true;
 
   Verify(target, func, preferences);
@@ -768,9 +768,9 @@ function Record (object, func, preferences, kind) {
 
   function Recursive (change) {
     var old_value = change.oldValue,
-        old_type = Syc.Type(old_value),
+        old_type = Type(old_value),
         new_value = change.newValue,
-        new_type = Syc.Type(new_value);
+        new_type = Type(new_value);
 
     if (old_type === 'array' || old_type === 'object') { 
       var referenced = Ancestors(root),
@@ -864,7 +864,7 @@ function Unwatch_Recursive (object, func) {
   var typeF = Type(func);
 
   if (typeO !== 'object' && typeO !== 'array') throw "Syc error: Syc.unverify_recursive takes an object as the first argument. You provided a " +typeO+ ".";
-  if (!Syc.exists(object)) throw "Syc error: in Syc.unverify_recursive(object/array, [function]), object/array must be a variable registered by Syc."
+  if (!Exists(object)) throw "Syc error: in Syc.unverify_recursive(object/array, [function]), object/array must be a variable registered by Syc."
   if (typeF !== 'undefined' && typeF !== 'function') throw "Syc error: Syc.unverify_recursive() takes an optional function as the second argument. You provided a " +typeF+ ".";
 
   // Unwatch_Recursive

@@ -268,7 +268,7 @@ function Observed (changes) {
     if (Type(object) === 'array' && property === 'length') continue;
 
     // Do not trigger when receiving changes from elsewhere.
-    if (Unlock(id, changed))////Locked(id, property, true))
+    if (Unlock(id, changed, property))////Locked(id, property, true))
       continue;
 
     var description = Describe(changed, group);
@@ -496,7 +496,7 @@ function Receive_Change (data, socket) {
   function Change_Property (type, object, property, value) {
     var id = object['syc-object-id'];
 
-    Lock(id, value);
+    Lock(id, property, value);
 
     if (type === 'delete') {
       if (object.hasOwnProperty(property))
@@ -592,7 +592,7 @@ function Type (obj) {
   return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
 }
 
-function Unlock (id, val) { 
+function Unlock (id, val, property) { 
   if (observable) {
     if (id in observe_lock) { 
       var lock = observe_lock[id],
@@ -608,13 +608,12 @@ function Unlock (id, val) {
   }
 }
 
-function Lock (id, val) { 
+function Lock (id, property, val) { 
   if (observable) {
       var locks = Syc.observe_lock,
           type = Type(val),
           value = Evaluate(type, val);
           identifier = property + type + value;
-
 
       // Note: i'm a little worried identifier being a string could cause issues.
       // Maybe not, since Evaluate() serializes data. If it ain't broke...

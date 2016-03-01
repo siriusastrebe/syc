@@ -305,8 +305,6 @@ function Describe (variable, group) {
         properties[property] = Describe(variable[property], group);
       }
 
-      Map_Object(variable);
-
       return {type: type, value: value, properties: properties, group: group};
     } else { 
       if (group && variable['syc-group'] !== group)
@@ -343,8 +341,6 @@ function Describe_Recursive (variable, group, visited) {
       properties[property] = Describe_Recursive(variable[property], group, visited);
     }
 
-    Map_Object(variable);
-
     return {type: type, value: value, properties: properties};
   } else { 
     return {type: type, value: value};
@@ -360,7 +356,6 @@ function New_Variable (name, variable, group) {
         description = Describe_Recursive(variable, group);
 
     Syc.variables[name] = id;
-    Map_Object(variable);
     Broadcast('syc-variable-new', {name: name, value: id, description: description}, group);
   } else { 
     // TODO: This is allowing Syc variables to be assigned to one another.
@@ -576,6 +571,8 @@ function Meta (variable, group, foreign_id) {
   Syc.objects[id] = variable;
  
   if (observable) Object.observe(variable, Observed);
+
+  Map_Object(variable);
   
   function token () { 
     function rand () { return Math.random().toString(36).substr(2) }

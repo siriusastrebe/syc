@@ -130,7 +130,7 @@ var Syc = {
       console.warn('Syc error: Received changes for an unknown change type: ' + type);
     }
 
-    Syc.Map_Object(variable);
+    Syc.Map_Property(variable, property);
 
     setTimeout(function () {Syc.Awake_Watchers(false, variable, property, type, oldValue)}, 0);
   },
@@ -158,8 +158,6 @@ var Syc = {
         }
 
         Syc.Meta(variable, read, id);
-
-        Syc.Map_Object(variable);
 
         return variable;
       }
@@ -248,8 +246,6 @@ var Syc = {
 
         value = Syc.Meta(variable);
 
-        Syc.Map_Object(variable);
-
         return {type: type, value: value, properties: properties};
       } else {
         return {type: type, value: value};
@@ -271,6 +267,7 @@ var Syc = {
 
     if (Syc.observable) Object.observe(variable, Syc.Observed);
 
+    Syc.Map_Object(variable);
 
     function token () { 
       function rand () { return Math.random().toString(36).substr(2) }
@@ -365,8 +362,6 @@ var Syc = {
     // Sanitize
     var type = typeof variable;
     if (type !== 'object') throw "Syc error: Syc.ancestors() takes an object, you provided " +type+ ".";
-    if (!Syc.exists(variable)) console.trace();
-    if (!Syc.exists(variable)) console.log(variable);
     if (!Syc.exists(variable)) throw "Syc error: Syc.ancestors can only be called on Syc registered objects and arrays.";
 
     // Ancestors
@@ -599,7 +594,6 @@ var Syc = {
 
   // ---- ---- ---- ----  Polyfill  ---- ---- ---- ---- 
   // ---- ---- ---- ----  Garbage Collection ---- ---- ---- ---- 
-  // Map_Object needs an syc-object-id, so call Meta on the object before Mapping it
   Map_Object: function (variable) { 
     var id = variable['syc-object-id'];
 

@@ -1,17 +1,25 @@
 Syc
 ===
 
-Register an ordinary javascript array or object with Syc, and an identical copy will become available on the client side. Changes by either the server or the client will be automatically synchronized.
+Register an ordinary javascript array or object with Syc on your Node.js server, and an identical copy will become available on the client side. Changes by either the server or the client will be automatically synchronized.
 
-    var shared = {hello: 'world'}
-    Syc.sync('name', shared);
+    Syc.sync('name', {hello: 'world'});
 
-No need to wrap your getters or setters, Syc will observe the change as it happens automatically (or via a polyfill for older clients).
+Changes are as easy as modifying the object or array. No need to wrap your getters or setters, Syc will observe the change as it happens automatically (or via a polyfill for older clients).
 
-    shared.hello = "Goodbye!!!"
+    var shared = Syc.list('name');
+    console.log(shared);
+    -> {hello: 'world'}
+    shared.hello = 'goodbye';
 
-Syc philosophy: Data bound to the registered variable is identical between the server and all clients, removing the headache of data synchronization. 
+Synchronize complex data structures with ease. Syc philosophy: Data bound to the registered variable is identical between the server and all clients, removing the headache of data synchronization. 
 
+Syc.sync('data', {
+        numbers: [0, 1, 2, 3, 4],
+        words: {one: 'one', two: 'two', three: 'three'},
+        bool: true,
+        nested: [{z: ['x']}, {y: 'w'}]
+})
 
 Examples
 ===

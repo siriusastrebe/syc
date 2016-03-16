@@ -14,12 +14,12 @@ Changes are as easy as modifying the object or array. No need to wrap your gette
 
 Synchronize complex data structures with ease. Syc philosophy: Data bound to the registered variable is identical between the server and all clients, removing the headache of data synchronization. 
 
-Syc.sync('data', {
-        numbers: [0, 1, 2, 3, 4],
-        words: {one: 'one', two: 'two', three: 'three'},
-        bool: true,
-        nested: [{z: ['x']}, {y: 'w'}]
-})
+    Syc.sync('data', {
+            numbers: [0, 1, 2, 3, 4],
+            words: {one: 'one', two: 'two', three: 'three'},
+            bool: true,
+            nested: [{z: ['x']}, {y: 'w'}]
+    })
 
 Examples
 ===

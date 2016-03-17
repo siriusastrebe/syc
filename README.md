@@ -10,6 +10,7 @@ Changes are as easy as modifying the object or array. No need to wrap your gette
     var shared = Syc.list('name');
     console.log(shared);
     -> {hello: 'world'}
+    
     shared.hello = 'goodbye';
 
 Synchronize complex data structures with ease. Syc philosophy: Data bound to the registered variable is identical between the server and all clients, removing the headache of data synchronization. 

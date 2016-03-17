@@ -58,7 +58,8 @@ The client can use `Syc.list()` to see all existing Syc variables.
     
 Modifying the shared variable is easy, just treat it as a regular object or array and changes will propagate to the server and other clients.
 
-    Syc.list('name').push('z');
+    var data = Syc.list('name');
+    data.push('z');
     
 
 ## Setting up Syc

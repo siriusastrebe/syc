@@ -4,7 +4,10 @@ Syc
 Register an ordinary javascript array or object with Syc on your Node.js server, and an identical copy will become available on the client side. Changes by either the server or the client will be automatically synchronized.
 
     // In Node.js
-    Syc.sync('name', {hello: 'world'});
+    var data = {}
+    Syc.sync('name', data);
+    
+    data['hello'] = "world";
 
 Changes are as easy as modifying the object or array. No need to wrap your getters or setters, Syc will observe the change as it happens automatically (or via a polyfill for older clients).
 
@@ -13,7 +16,7 @@ Changes are as easy as modifying the object or array. No need to wrap your gette
     console.log(shared);
     -> {hello: 'world'}
     
-    shared.hello = 'goodbye';
+    shared.farewell = 'goodbye';
 
 Synchronize complex data structures with ease. Syc philosophy: Data bound to the registered variable is identical between the server and all clients, removing the headache of data synchronization. 
 

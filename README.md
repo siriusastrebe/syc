@@ -1,3 +1,12 @@
+It's with a heavy heart that I announce that I am no longer supporting this library. 
+
+While I still love the idea of it, other tools such as firebase or meteor can accomplish a similar service while integrating with databases.
+
+The advantages of Syc, namely that you are only dealing with javascript objects, is lost with large datasets as Object.observe is no longer supported and dirty-checking is an O(n) operation that must be run continually. Additionally, Syc does not handle connection interruption well.
+
+With all these in mind, I've decided to focus my effort on my work. Thank you for the interest in this wonderful library, it has been a joy to develop.
+
+
 Syc
 ===
 

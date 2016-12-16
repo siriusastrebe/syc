@@ -2,7 +2,7 @@ It's with a heavy heart that I announce that I am no longer supporting this libr
 
 I ended this project when Object.observe became deprecated, with all alternatives running an inefficient O(n) algorithm frequently.
 
-However, I do plan to make a second version of this library. With getters and setters, or proxies, this library could be useful once again. New features I plan to bake into the next iteration would be guaranteed delivery and connection interruption. Feel free to try this library as it is in a working state. 
+However, I do plan to make a second version of this library. With getters and setters, or proxies, this library could be useful once again. New features I plan to bake into the next iteration would be guaranteed delivery and connection interruption. Until then feel free to try this library as it is in a working state. 
 
 
 Syc

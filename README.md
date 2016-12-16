@@ -1,10 +1,8 @@
 It's with a heavy heart that I announce that I am no longer supporting this library. 
 
-While I still love the idea of it, other tools such as firebase or meteor can accomplish a similar service while integrating with databases.
+I ended this project when Object.observe became deprecated, with all alternatives running an inefficient O(n) algorithm frequently.
 
-The advantages of Syc, namely that you are only dealing with javascript objects, is lost with large datasets as Object.observe is no longer supported and dirty-checking is an O(n) operation that must be run continually. Additionally, Syc and by extension, socket.io, cannot guarantee delivery and does not always handle connection interruption.
-
-With all these in mind, I've decided to focus my effort on my work. Thank you for the interest in this wonderful library, it has been a joy to develop.
+However, I do plan to make a second version of this library. With getters and setters, or proxies, this library could be useful once again. New features I plan to bake into the next iteration would be guaranteed delivery and connection interruption. Feel free to try this library as it is in a working state. 
 
 
 Syc
